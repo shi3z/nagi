@@ -6,11 +6,7 @@ Supports fullscreen applications like tmux and Claude Code.
 
 **[日本語版 README](README.ja.md)**
 
-![Nagi Screenshot](images/image1.png)
-
-### Works on iPhone too
-
-![Nagi on iPhone](images/iPhone.png)
+<img src="images/image1.png" width="400"> <img src="images/iPhone.png" width="200">
 
 ## Features
 
