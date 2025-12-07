@@ -4,7 +4,7 @@ Touch-friendly web-based terminal optimized for vibe coding. Access your termina
 
 Supports fullscreen applications like tmux and Claude Code.
 
-> **Warning**: This tool has no authentication. Use only within a private VPN or LAN.
+> **Security**: Token-based authentication is enabled by default. A random access token is generated on startup and displayed in the terminal.
 
 **[日本語版 README](README.ja.md)**
 
@@ -70,6 +70,9 @@ Edit `config.json`:
 | `startup_command` | Command to run on connection | `tmux a \|\| tmux new` |
 | `shell` | Shell to use | `/bin/bash` |
 | `port` | Listen port | `8765` |
+| `token` | Fixed access token (optional) | Random on startup |
+
+You can also set `NAGI_TOKEN` environment variable to use a fixed token.
 
 ## Control Panel
 

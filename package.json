@@ -1,6 +1,6 @@
 {
   "name": "nagi-terminal",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Touch-friendly web-based terminal for iOS/iPad with tmux support",
   "main": "index.js",
   "bin": {

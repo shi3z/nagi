@@ -516,7 +516,8 @@
         function connect() {
             try {
                 const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const url = `${protocol}//${window.location.host}/ws`;
+                const token = window.NAGI_TOKEN || '';
+                const url = `${protocol}//${window.location.host}/ws?token=${token}`;
                 log('Connecting to ' + url);
 
                 ws = new WebSocket(url);

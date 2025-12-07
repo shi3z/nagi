@@ -6,14 +6,16 @@ import fcntl
 import json
 import os
 import pty
+import secrets
+import socket
 import struct
 import subprocess
 import sys
 import termios
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 # Base directory for resolving paths (PyInstaller compatible)
@@ -43,6 +45,9 @@ def load_config():
 
 config = load_config()
 
+# Generate or load authentication token
+AUTH_TOKEN = os.environ.get("NAGI_TOKEN") or config.get("token") or secrets.token_urlsafe(24)
+
 app = FastAPI(title="Nagi")
 
 # Serve static files
@@ -57,16 +62,32 @@ def set_winsize(fd: int, rows: int, cols: int) -> None:
     fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
 
 
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    """Serve the main terminal page."""
+@app.get("/")
+async def index(token: str = Query(None)):
+    """Serve the main terminal page with token validation."""
+    if token != AUTH_TOKEN:
+        return HTMLResponse(
+            content="""<!DOCTYPE html>
+<html><head><title>Nagi - Unauthorized</title>
+<style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;color:#eee;}
+.box{text-align:center;padding:40px;background:#16213e;border-radius:10px;}
+h1{color:#e94560;}</style></head>
+<body><div class="box"><h1>Unauthorized</h1><p>Invalid or missing token.<br>Please use the URL displayed in the terminal.</p></div></body></html>""",
+            status_code=401
+        )
     html_path = BASE_DIR / "templates" / "index.html"
-    return html_path.read_text()
+    html_content = html_path.read_text()
+    # Inject token into HTML for WebSocket authentication
+    html_content = html_content.replace("</head>", f'<script>window.NAGI_TOKEN="{AUTH_TOKEN}";</script></head>')
+    return HTMLResponse(content=html_content)
 
 
 @app.websocket("/ws")
-async def websocket_terminal(websocket: WebSocket):
+async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
     """WebSocket endpoint for terminal communication."""
+    if token != AUTH_TOKEN:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
     await websocket.accept()
 
     # Create pseudo-terminal
@@ -176,7 +197,29 @@ async def websocket_terminal(websocket: WebSocket):
                 pass
 
 
+def get_local_ip():
+    """Get local IP address."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "localhost"
+
+
 if __name__ == "__main__":
     import uvicorn
     port = config.get("port", 8765)
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    local_ip = get_local_ip()
+
+    print("\n" + "=" * 50)
+    print("  Nagi - Touch-friendly Web Terminal")
+    print("=" * 50)
+    print(f"\n  Access URL (copy this to your browser):\n")
+    print(f"    http://{local_ip}:{port}/?token={AUTH_TOKEN}")
+    print(f"\n  Local: http://localhost:{port}/?token={AUTH_TOKEN}")
+    print("\n" + "=" * 50 + "\n")
+
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
