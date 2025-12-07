@@ -4,6 +4,8 @@ Touch-friendly web-based terminal optimized for vibe coding. Access your termina
 
 Supports fullscreen applications like tmux and Claude Code.
 
+> **Warning**: This tool has no authentication. Use only within a private VPN or LAN.
+
 **[日本語版 README](README.ja.md)**
 
 <img src="images/mainvisual.png" width="600">

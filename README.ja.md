@@ -4,6 +4,8 @@
 
 tmuxやClaude Codeなどのフルスクリーンアプリケーションに対応。
 
+> **警告**: このツールには認証機能がありません。プライベートVPNまたはLAN内でのみ使用してください。
+
 <img src="images/mainvisual.png" width="600">
 
 ## 特徴
