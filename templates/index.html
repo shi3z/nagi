@@ -694,9 +694,9 @@
             term.open(document.getElementById('terminal'));
 
             // Fix for iOS third-party IME (e.g., ATOK) where composition events don't fire
-            // Block keypress with multi-char CJK to prevent xterm.js from sending only first char
+            // Block keypress with CJK characters to prevent duplicate input
             term.attachCustomKeyEventHandler((ev) => {
-                if (ev.type === 'keypress' && ev.key && ev.key.length > 1 && /[\u3000-\u9fff\uac00-\ud7af]/.test(ev.key)) {
+                if (ev.type === 'keypress' && ev.key && /[\u3000-\u9fff\uac00-\ud7af]/.test(ev.key)) {
                     return false;
                 }
                 return true;
