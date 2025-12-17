@@ -79,8 +79,11 @@ h1{color:#e94560;}</style></head>
         )
     html_path = BASE_DIR / "templates" / "index.html"
     html_content = html_path.read_text()
-    # Inject token into HTML for WebSocket authentication
-    html_content = html_content.replace("</head>", f'<script>window.NAGI_TOKEN="{AUTH_TOKEN}";</script></head>')
+    # Inject token, hostname and IP into HTML
+    hostname = get_hostname()
+    ip_addr = get_ip_address()
+    inject_script = f'<script>window.NAGI_TOKEN="{AUTH_TOKEN}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";</script></head>'
+    html_content = html_content.replace("</head>", inject_script)
     return HTMLResponse(content=html_content)
 
 
@@ -202,6 +205,19 @@ async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
 def get_hostname():
     """Get hostname for URL."""
     return socket.gethostname()
+
+
+def get_ip_address():
+    """Get local IP address."""
+    try:
+        # Create a socket to determine the outgoing IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
 
 
 def print_qr_code(url: str):

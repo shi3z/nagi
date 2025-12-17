@@ -297,6 +297,54 @@
             min-width: 100px;
         }
 
+        /* QWERTY Keyboard Panel */
+        .qwerty-panel {
+            display: none;
+            background: #0a0a1a;
+            padding: 8px;
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+
+        .qwerty-panel.visible {
+            display: block;
+        }
+
+        .qwerty-row {
+            display: flex;
+            justify-content: center;
+            gap: 3px;
+            margin-bottom: 3px;
+        }
+
+        .qwerty-btn {
+            background: #0f3460;
+            color: #e94560;
+            border: 1px solid #e94560;
+            border-radius: 4px;
+            padding: 10px 0;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            min-width: 32px;
+            text-align: center;
+            transition: all 0.15s ease;
+        }
+
+        .qwerty-btn:active {
+            background: #e94560;
+            color: #16213e;
+        }
+
+        .qwerty-btn.space {
+            min-width: 150px;
+        }
+
+        .qwerty-btn.medium {
+            min-width: 50px;
+            font-size: 12px;
+        }
+
         .quick-cmd {
             background: #1a1a2e;
             font-size: 12px;
@@ -443,6 +491,7 @@
                     </div>
                     <div class="button-row iphone-hide">
                         <button class="btn wide" id="tmuxBtn">tmux</button>
+                        <button class="btn wide" id="qwertyBtn">KB</button>
                         <button class="btn quick-cmd" id="lsBtn">ls</button>
                         <button class="btn quick-cmd" id="cdBtn">cd ..</button>
                     </div>
@@ -487,6 +536,62 @@
                 <div class="button-row">
                     <button class="btn" data-tmux="[">[ (scroll)</button>
                     <button class="btn" id="tmuxQuitBtn">q (quit)</button>
+                </div>
+            </div>
+
+            <div class="qwerty-panel" id="qwertyPanel">
+                <div class="qwerty-row">
+                    <button class="qwerty-btn" data-key="1">1</button>
+                    <button class="qwerty-btn" data-key="2">2</button>
+                    <button class="qwerty-btn" data-key="3">3</button>
+                    <button class="qwerty-btn" data-key="4">4</button>
+                    <button class="qwerty-btn" data-key="5">5</button>
+                    <button class="qwerty-btn" data-key="6">6</button>
+                    <button class="qwerty-btn" data-key="7">7</button>
+                    <button class="qwerty-btn" data-key="8">8</button>
+                    <button class="qwerty-btn" data-key="9">9</button>
+                    <button class="qwerty-btn" data-key="0">0</button>
+                </div>
+                <div class="qwerty-row">
+                    <button class="qwerty-btn" data-key="q">q</button>
+                    <button class="qwerty-btn" data-key="w">w</button>
+                    <button class="qwerty-btn" data-key="e">e</button>
+                    <button class="qwerty-btn" data-key="r">r</button>
+                    <button class="qwerty-btn" data-key="t">t</button>
+                    <button class="qwerty-btn" data-key="y">y</button>
+                    <button class="qwerty-btn" data-key="u">u</button>
+                    <button class="qwerty-btn" data-key="i">i</button>
+                    <button class="qwerty-btn" data-key="o">o</button>
+                    <button class="qwerty-btn" data-key="p">p</button>
+                </div>
+                <div class="qwerty-row">
+                    <button class="qwerty-btn" data-key="a">a</button>
+                    <button class="qwerty-btn" data-key="s">s</button>
+                    <button class="qwerty-btn" data-key="d">d</button>
+                    <button class="qwerty-btn" data-key="f">f</button>
+                    <button class="qwerty-btn" data-key="g">g</button>
+                    <button class="qwerty-btn" data-key="h">h</button>
+                    <button class="qwerty-btn" data-key="j">j</button>
+                    <button class="qwerty-btn" data-key="k">k</button>
+                    <button class="qwerty-btn" data-key="l">l</button>
+                </div>
+                <div class="qwerty-row">
+                    <button class="qwerty-btn medium" id="shiftBtn">Shift</button>
+                    <button class="qwerty-btn" data-key="z">z</button>
+                    <button class="qwerty-btn" data-key="x">x</button>
+                    <button class="qwerty-btn" data-key="c">c</button>
+                    <button class="qwerty-btn" data-key="v">v</button>
+                    <button class="qwerty-btn" data-key="b">b</button>
+                    <button class="qwerty-btn" data-key="n">n</button>
+                    <button class="qwerty-btn" data-key="m">m</button>
+                    <button class="qwerty-btn" data-key="/">/ </button>
+                </div>
+                <div class="qwerty-row">
+                    <button class="qwerty-btn" data-key="-">-</button>
+                    <button class="qwerty-btn" data-key="=">=</button>
+                    <button class="qwerty-btn space" data-key=" ">Space</button>
+                    <button class="qwerty-btn" data-key=".">.</button>
+                    <button class="qwerty-btn" data-key=",">,</button>
                 </div>
             </div>
         </div>
@@ -628,6 +733,10 @@
                     statusText.textContent = 'Connected';
                     debugEl.style.display = 'none';
                     fitTerminal();
+                    // Set window title with hostname and IP
+                    const host = window.NAGI_HOST || 'Nagi';
+                    const ip = window.NAGI_IP || '';
+                    document.title = ip ? `${host} (${ip}) - Nagi` : `${host} - Nagi`;
                 };
 
                 ws.onclose = (e) => {
@@ -874,6 +983,82 @@
         // tmux scroll mode quit (sends 'q' without Ctrl+B prefix)
         const tmuxQuitBtn = document.getElementById('tmuxQuitBtn');
         if (tmuxQuitBtn) tmuxQuitBtn.addEventListener('click', () => send('q'));
+
+        // QWERTY keyboard toggle
+        const qwertyBtn = document.getElementById('qwertyBtn');
+        const qwertyPanel = document.getElementById('qwertyPanel');
+        let shiftActive = false;
+        const shiftBtn = document.getElementById('shiftBtn');
+
+        const terminalContainer = document.getElementById('terminal-container');
+        const appContainer = document.getElementById('app');
+        if (qwertyBtn) {
+            qwertyBtn.addEventListener('click', () => {
+                qwertyPanel.classList.toggle('visible');
+                const isVisible = qwertyPanel.classList.contains('visible');
+                qwertyBtn.textContent = isVisible ? 'KB ✓' : 'KB';
+                // Adjust terminal size when keyboard is shown/hidden
+                if (isVisible) {
+                    terminalContainer.style.flex = '0 0 55vh';
+                    appContainer.style.overflow = 'auto';
+                } else {
+                    terminalContainer.style.flex = '1';
+                    appContainer.style.overflow = 'hidden';
+                }
+                // Refit terminal after layout change
+                setTimeout(() => {
+                    fitTerminal();
+                    if (isVisible) {
+                        qwertyPanel.scrollIntoView({ behavior: 'smooth', block: 'end' });
+                    }
+                }, 50);
+            });
+        }
+
+        // Shift mappings for symbols
+        const shiftMap = {
+            '1': '!', '2': '@', '3': '#', '4': '$', '5': '%',
+            '6': '^', '7': '&', '8': '*', '9': '(', '0': ')',
+            '-': '_', '=': '+', '/': '?', '.': '>', ',': '<'
+        };
+
+        // Update key labels based on shift state
+        function updateKeyLabels() {
+            document.querySelectorAll('[data-key]').forEach(btn => {
+                const key = btn.dataset.key;
+                if (key === ' ') return; // Skip space bar
+                if (key.match(/^[a-z]$/)) {
+                    btn.textContent = shiftActive ? key.toUpperCase() : key;
+                } else if (shiftMap[key]) {
+                    btn.textContent = shiftActive ? shiftMap[key] : key;
+                }
+            });
+        }
+
+        // Shift toggle
+        if (shiftBtn) {
+            shiftBtn.addEventListener('click', () => {
+                shiftActive = !shiftActive;
+                shiftBtn.style.background = shiftActive ? '#e94560' : '#0f3460';
+                shiftBtn.style.color = shiftActive ? '#16213e' : '#e94560';
+                updateKeyLabels();
+            });
+        }
+
+        // QWERTY key handling
+        document.querySelectorAll('[data-key]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                let key = btn.dataset.key;
+                if (shiftActive) {
+                    if (key.match(/^[a-z]$/)) {
+                        key = key.toUpperCase();
+                    } else if (shiftMap[key]) {
+                        key = shiftMap[key];
+                    }
+                }
+                send(key);
+            });
+        });
 
         const textModal = document.getElementById('textModal');
         const textInput = document.getElementById('textInput');
