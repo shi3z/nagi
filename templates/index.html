@@ -694,19 +694,19 @@
             term.open(document.getElementById('terminal'));
 
             // Fix for iOS third-party IME (e.g., ATOK) where composition events don't fire
-            // Block keypress with CJK characters to prevent duplicate input
+            // Block multi-char keypress to prevent xterm.js from sending only first char
             term.attachCustomKeyEventHandler((ev) => {
-                if (ev.type === 'keypress' && ev.key && /[\u3000-\u9fff\uac00-\ud7af]/.test(ev.key)) {
+                if (ev.type === 'keypress' && ev.key && ev.key.length > 1) {
                     return false;
                 }
                 return true;
             });
 
-            // Send CJK input directly when composition events don't fire (iOS IME issue)
+            // Send input directly when composition events don't fire (iOS IME issue)
             const xtermTextarea = document.querySelector('.xterm-helper-textarea');
             if (xtermTextarea) {
                 xtermTextarea.addEventListener('input', (e) => {
-                    if (!e.isComposing && e.data && /[\u3000-\u9fff\uac00-\ud7af]/.test(e.data)) {
+                    if (!e.isComposing && e.data && e.data.length > 1) {
                         if (ws && ws.readyState === WebSocket.OPEN) {
                             ws.send(e.data);
                         }
