@@ -665,6 +665,75 @@
             }
         }
 
+        // Flag to ignore xterm input while IME mode is active
+        let imeMode = false;
+
+        // Create an overlay input for proper IME handling on iOS (for ATOK and other third-party IMEs)
+        const imeInput = document.createElement('input');
+        imeInput.type = 'text';
+        imeInput.id = 'imeInput';
+        imeInput.autocomplete = 'off';
+        imeInput.autocorrect = 'off';
+        imeInput.autocapitalize = 'off';
+        imeInput.spellcheck = false;
+        imeInput.style.cssText = `
+            position: fixed;
+            bottom: 200px;
+            left: 10px;
+            right: 10px;
+            height: 44px;
+            font-size: 18px;
+            padding: 8px 12px;
+            background: #1a1a2e;
+            color: #eee;
+            border: 2px solid #e94560;
+            border-radius: 8px;
+            outline: none;
+            z-index: 100;
+            display: none;
+        `;
+        document.body.appendChild(imeInput);
+
+        // Toggle IME input mode
+        function toggleIMEMode() {
+            imeMode = !imeMode;
+            imeInput.style.display = imeMode ? 'block' : 'none';
+            if (imeMode) {
+                imeInput.focus();
+                imeInput.value = '';
+            } else {
+                imeInput.blur();
+                term.focus();
+            }
+            // Update Text button appearance
+            const textBtn = document.getElementById('textInputBtn');
+            if (textBtn) {
+                textBtn.classList.toggle('active', imeMode);
+            }
+        }
+
+        // Handle IME input - support both Enter key and iOS "確定" button
+        imeInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (imeInput.value) {
+                    send(imeInput.value);
+                    imeInput.value = '';
+                }
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                toggleIMEMode();
+            }
+        });
+
+        // Send on blur if there's uncommitted text (user tapped outside)
+        imeInput.addEventListener('blur', () => {
+            if (imeInput.value && imeMode) {
+                send(imeInput.value);
+                imeInput.value = '';
+            }
+        });
+
         if (term) {
             term.onData((data) => {
                 // Filter out terminal response sequences that shouldn't be sent back to PTY
@@ -674,6 +743,10 @@
                 // Also filter incomplete responses where ESC may have been dropped
                 if (/^\x1b\[[?>]?[0-9;]*[cR]$/.test(data) || /^[?>][0-9;]*c$/.test(data)) {
                     return; // Don't send terminal responses back to PTY
+                }
+                // Ignore xterm input when IME mode is active (manual Text button)
+                if (imeMode) {
+                    return;
                 }
                 send(data);
             });
@@ -805,8 +878,8 @@
         const textModal = document.getElementById('textModal');
         const textInput = document.getElementById('textInput');
         document.getElementById('textInputBtn').addEventListener('click', () => {
-            textModal.classList.add('visible');
-            textInput.focus();
+            // Use inline IME input instead of modal for better iOS experience
+            toggleIMEMode();
         });
 
         // Ctrl keyboard modal

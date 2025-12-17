@@ -100,7 +100,9 @@ Expand with the `tmux` button:
 - **[**: Copy mode
 
 ### Text Input
-Click the `Text` button to open a modal for pasting long text or CJK characters.
+Click the `Text` button to open an input field for CJK (Japanese/Chinese/Korean) text entry.
+
+> **Note for iOS users**: Third-party IMEs like ATOK do not work correctly with xterm.js due to composition event limitations. Use the `Text` button for Japanese input. The standard iOS keyboard works normally.
 
 ## Requirements
 
