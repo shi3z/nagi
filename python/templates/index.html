@@ -693,6 +693,28 @@
             log('Opening terminal...');
             term.open(document.getElementById('terminal'));
 
+            // Fix for iOS third-party IME (e.g., ATOK) where composition events don't fire
+            // Block keypress with multi-char CJK to prevent xterm.js from sending only first char
+            term.attachCustomKeyEventHandler((ev) => {
+                if (ev.type === 'keypress' && ev.key && ev.key.length > 1 && /[\u3000-\u9fff\uac00-\ud7af]/.test(ev.key)) {
+                    return false;
+                }
+                return true;
+            });
+
+            // Send CJK input directly when composition events don't fire (iOS IME issue)
+            const xtermTextarea = document.querySelector('.xterm-helper-textarea');
+            if (xtermTextarea) {
+                xtermTextarea.addEventListener('input', (e) => {
+                    if (!e.isComposing && e.data && /[\u3000-\u9fff\uac00-\ud7af]/.test(e.data)) {
+                        if (ws && ws.readyState === WebSocket.OPEN) {
+                            ws.send(e.data);
+                        }
+                        setTimeout(() => { xtermTextarea.value = ''; }, 0);
+                    }
+                }, true);
+            }
+
             log('Fitting terminal...');
             fitAddon.fit();
             document.getElementById('termSize').textContent = `${term.cols}x${term.rows}`;
