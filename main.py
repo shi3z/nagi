@@ -326,6 +326,23 @@ async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
 
 def get_hostname():
     """Get hostname for URL."""
+    if AUTH_MODE == "tailscale":
+        # Use Tailscale node name for Tailnet access
+        try:
+            result = subprocess.run(
+                ["tailscale", "status", "--self", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                # Get short hostname (without domain suffix)
+                hostname = data.get("Self", {}).get("HostName", "")
+                if hostname:
+                    return hostname
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+            pass
     return socket.gethostname()
 
 
