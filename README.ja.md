@@ -4,7 +4,7 @@
 
 tmuxやClaude Codeなどのフルスクリーンアプリケーションに対応。
 
-> **セキュリティ**: トークン認証がデフォルトで有効です。起動時にランダムなアクセストークンとQRコードが表示され、スマホで簡単に接続できます。
+> **セキュリティ**: トークン認証がデフォルトで有効です。Tailscale認証にも対応しており、Tailnetwork内から安全にアクセスできます。
 
 <img src="images/mainvisual.png" width="600">
 
@@ -16,6 +16,7 @@ tmuxやClaude Codeなどのフルスクリーンアプリケーションに対�
 - **日本語入力**: テキスト入力モーダルで長文入力に対応
 - **自動コマンド実行**: 接続時に指定コマンドを自動実行
 - **トークン認証**: 自動生成トークンで安全にアクセス
+- **Tailscale認証**: Tailscaleネットワーク経由でゼロコンフィグ認証
 - **QRコード**: スマホでスキャンして即座に接続
 - **xterm.js**: フル機能のターミナルエミュレーション
 
@@ -61,7 +62,11 @@ uv run python main.py
 {
     "startup_command": "tmux a || tmux new",
     "shell": "/bin/bash",
-    "port": 8765
+    "port": 8765,
+    "auth": {
+        "mode": "tailscale",
+        "allowed_users": []
+    }
 }
 ```
 
@@ -71,8 +76,25 @@ uv run python main.py
 | `shell` | 使用するシェル | `/bin/bash` |
 | `port` | 待ち受けポート | `8765` |
 | `token` | 固定アクセストークン（任意） | 起動時にランダム生成 |
+| `auth.mode` | 認証モード: `token` または `tailscale` | `token` |
+| `auth.allowed_users` | 許可するTailscaleユーザー（空=全員） | `[]` |
 
-環境変数 `NAGI_TOKEN` を設定することで固定トークンを使用することもできます。
+### 認証モード
+
+**トークンモード**（デフォルト）: 自動生成または固定トークンを使用。起動時にQRコードが表示されます。
+
+**Tailscaleモード**: Tailscaleネットワーク経由で認証。トークン不要 - 同じTailnetに参加しているユーザーのみアクセス可能。Tailnet外からのアクセスは完全にブロックされます。
+
+```json
+{
+    "auth": {
+        "mode": "tailscale",
+        "allowed_users": ["user@example.com"]
+    }
+}
+```
+
+環境変数 `NAGI_TOKEN` を設定することで固定トークンを使用することもできます（トークンモードのみ）。
 
 ## コントロールパネル
 

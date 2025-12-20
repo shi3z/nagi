@@ -4,7 +4,7 @@ Touch-friendly web-based terminal optimized for vibe coding. Access your termina
 
 Supports fullscreen applications like tmux and Claude Code.
 
-> **Security**: Token-based authentication is enabled by default. A random access token is generated on startup and displayed with a QR code for easy mobile access.
+> **Security**: Token-based authentication is enabled by default. Tailscale authentication is also supported for secure access within your Tailnet.
 
 **[日本語版 README](README.ja.md)**
 
@@ -18,6 +18,7 @@ Supports fullscreen applications like tmux and Claude Code.
 - **Text input**: Modal for pasting long text or CJK characters
 - **Auto-execute**: Run commands automatically on connection
 - **Token auth**: Secure access with auto-generated token
+- **Tailscale auth**: Zero-config authentication via Tailscale network
 - **QR code**: Scan to connect from your phone instantly
 - **xterm.js**: Full-featured terminal emulation
 
@@ -63,7 +64,11 @@ Edit `config.json`:
 {
     "startup_command": "tmux a || tmux new",
     "shell": "/bin/bash",
-    "port": 8765
+    "port": 8765,
+    "auth": {
+        "mode": "tailscale",
+        "allowed_users": []
+    }
 }
 ```
 
@@ -73,8 +78,25 @@ Edit `config.json`:
 | `shell` | Shell to use | `/bin/bash` |
 | `port` | Listen port | `8765` |
 | `token` | Fixed access token (optional) | Random on startup |
+| `auth.mode` | Authentication mode: `token` or `tailscale` | `token` |
+| `auth.allowed_users` | Allowed Tailscale users (empty = all) | `[]` |
 
-You can also set `NAGI_TOKEN` environment variable to use a fixed token.
+### Authentication Modes
+
+**Token mode** (default): Uses auto-generated or fixed token. QR code displayed on startup.
+
+**Tailscale mode**: Authenticates via Tailscale network. No token needed - only users within your Tailnet can access. Users outside your Tailnet are completely blocked.
+
+```json
+{
+    "auth": {
+        "mode": "tailscale",
+        "allowed_users": ["user@example.com"]
+    }
+}
+```
+
+You can also set `NAGI_TOKEN` environment variable to use a fixed token (token mode only).
 
 ## Control Panel
 
