@@ -4,6 +4,7 @@
 import asyncio
 import fcntl
 import json
+import logging
 import os
 import pty
 import secrets
@@ -13,10 +14,19 @@ import subprocess
 import sys
 import termios
 from pathlib import Path
+from typing import Optional
 
 import qrcode
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("nagi")
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -47,8 +57,60 @@ def load_config():
 
 config = load_config()
 
-# Generate or load authentication token
+# Authentication configuration
+auth_config = config.get("auth", {})
+AUTH_MODE = auth_config.get("mode", "token")  # "tailscale" or "token"
+ALLOWED_USERS = auth_config.get("allowed_users", [])
+
+# Generate or load authentication token (for token mode)
 AUTH_TOKEN = os.environ.get("NAGI_TOKEN") or config.get("token") or secrets.token_urlsafe(24)
+
+# Session management for Tailscale mode
+SESSION_SECRET = secrets.token_urlsafe(32)
+active_sessions: dict[str, dict] = {}  # session_token -> user_info
+
+
+def get_tailscale_user(client_ip: str) -> Optional[dict]:
+    """Get Tailscale user info from client IP using tailscale whois."""
+    try:
+        result = subprocess.run(
+            ["tailscale", "whois", "--json", client_ip],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            user_profile = data.get("UserProfile", {})
+            return {
+                "login": user_profile.get("LoginName", ""),
+                "display_name": user_profile.get("DisplayName", ""),
+                "profile_pic": user_profile.get("ProfilePicURL", ""),
+                "node": data.get("Node", {}).get("Name", ""),
+            }
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+        pass
+    return None
+
+
+def create_session(user_info: dict) -> str:
+    """Create a new session and return the session token."""
+    session_token = secrets.token_urlsafe(32)
+    active_sessions[session_token] = user_info
+    return session_token
+
+
+def verify_session(session_token: str) -> Optional[dict]:
+    """Verify a session token and return user info if valid."""
+    return active_sessions.get(session_token)
+
+
+def is_user_allowed(user_info: dict) -> bool:
+    """Check if user is in the allowed users list."""
+    if not ALLOWED_USERS:
+        return True  # Empty list = allow all Tailnet users
+    login = user_info.get("login", "")
+    return login in ALLOWED_USERS
 
 app = FastAPI(title="Nagi")
 
@@ -64,25 +126,66 @@ def set_winsize(fd: int, rows: int, cols: int) -> None:
     fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
 
 
+def get_unauthorized_html(message: str = "Unauthorized") -> str:
+    """Return HTML for unauthorized access."""
+    return f"""<!DOCTYPE html>
+<html><head><title>Nagi - {message}</title>
+<style>body{{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;color:#eee;}}
+.box{{text-align:center;padding:40px;background:#16213e;border-radius:10px;}}
+h1{{color:#e94560;}}</style></head>
+<body><div class="box"><h1>{message}</h1><p>Access denied.</p></div></body></html>"""
+
+
 @app.get("/")
-async def index(token: str = Query(None)):
-    """Serve the main terminal page with token validation."""
-    if token != AUTH_TOKEN:
-        return HTMLResponse(
-            content="""<!DOCTYPE html>
-<html><head><title>Nagi - Unauthorized</title>
-<style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;color:#eee;}
-.box{text-align:center;padding:40px;background:#16213e;border-radius:10px;}
-h1{color:#e94560;}</style></head>
-<body><div class="box"><h1>Unauthorized</h1><p>Invalid or missing token.<br>Please use the URL displayed in the terminal.</p></div></body></html>""",
-            status_code=401
-        )
+async def index(request: Request, token: str = Query(None)):
+    """Serve the main terminal page with authentication."""
+    session_token = None
+    user_info = None
+
+    client_ip = request.client.host if request.client else "unknown"
+
+    if AUTH_MODE == "tailscale":
+        # Tailscale authentication mode
+        if not client_ip or client_ip == "unknown":
+            logger.warning(f"Connection rejected: No client IP")
+            return HTMLResponse(content=get_unauthorized_html("No Client IP"), status_code=401)
+
+        user_info = get_tailscale_user(client_ip)
+        if not user_info:
+            logger.warning(f"Connection rejected: {client_ip} - Not a Tailscale connection")
+            return HTMLResponse(
+                content=get_unauthorized_html("Not a Tailscale connection"),
+                status_code=401
+            )
+
+        if not is_user_allowed(user_info):
+            logger.warning(f"Connection rejected: {client_ip} - User '{user_info.get('login')}' not allowed")
+            return HTMLResponse(
+                content=get_unauthorized_html("User not allowed"),
+                status_code=403
+            )
+
+        # Create session for WebSocket authentication
+        session_token = create_session(user_info)
+        logger.info(f"Access granted: {client_ip} - {user_info.get('display_name')} ({user_info.get('login')}) from {user_info.get('node')}")
+    else:
+        # Token authentication mode (legacy)
+        if token != AUTH_TOKEN:
+            logger.warning(f"Connection rejected: {client_ip} - Invalid token")
+            return HTMLResponse(
+                content=get_unauthorized_html("Invalid or missing token"),
+                status_code=401
+            )
+        session_token = AUTH_TOKEN
+        logger.info(f"Access granted: {client_ip} - Token auth")
+
     html_path = BASE_DIR / "templates" / "index.html"
     html_content = html_path.read_text()
     # Inject token, hostname and IP into HTML
     hostname = get_hostname()
     ip_addr = get_ip_address()
-    inject_script = f'<script>window.NAGI_TOKEN="{AUTH_TOKEN}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";</script></head>'
+    user_display = user_info.get("display_name", "") if user_info else ""
+    inject_script = f'<script>window.NAGI_TOKEN="{session_token}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";window.NAGI_USER="{user_display}";</script></head>'
     html_content = html_content.replace("</head>", inject_script)
     return HTMLResponse(content=html_content)
 
@@ -90,9 +193,24 @@ h1{color:#e94560;}</style></head>
 @app.websocket("/ws")
 async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
     """WebSocket endpoint for terminal communication."""
-    if token != AUTH_TOKEN:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
+    client_ip = websocket.client.host if websocket.client else "unknown"
+
+    # Verify authentication
+    if AUTH_MODE == "tailscale":
+        user_info = verify_session(token) if token else None
+        if not user_info:
+            logger.warning(f"WebSocket rejected: {client_ip} - Invalid session")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+        logger.info(f"WebSocket connected: {client_ip} - {user_info.get('display_name', 'unknown')}")
+    else:
+        if token != AUTH_TOKEN:
+            logger.warning(f"WebSocket rejected: {client_ip} - Invalid token")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+        logger.info(f"WebSocket connected: {client_ip}")
+        user_info = None
+
     await websocket.accept()
 
     # Create pseudo-terminal
@@ -200,6 +318,10 @@ async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
                 process.kill()
             except Exception:
                 pass
+        if AUTH_MODE == "tailscale" and user_info:
+            logger.info(f"WebSocket disconnected: {client_ip} - {user_info.get('display_name', 'unknown')}")
+        else:
+            logger.info(f"WebSocket disconnected: {client_ip}")
 
 
 def get_hostname():
@@ -234,15 +356,29 @@ if __name__ == "__main__":
     import uvicorn
     port = config.get("port", 8765)
     hostname = get_hostname()
-    access_url = f"http://{hostname}:{port}/?token={AUTH_TOKEN}"
 
     print("\n" + "=" * 50)
     print("  Nagi - Touch-friendly Web Terminal")
     print("=" * 50)
-    print(f"\n  Access URL:\n")
-    print(f"    {access_url}")
-    print(f"\n  Scan QR code to connect:\n")
-    print_qr_code(access_url)
+
+    if AUTH_MODE == "tailscale":
+        access_url = f"http://{hostname}:{port}/"
+        print(f"\n  Auth Mode: Tailscale")
+        if ALLOWED_USERS:
+            print(f"  Allowed Users: {', '.join(ALLOWED_USERS)}")
+        else:
+            print(f"  Allowed Users: All Tailnet users")
+        print(f"\n  Access URL:\n")
+        print(f"    {access_url}")
+        print(f"\n  (Access via Tailscale network only)")
+    else:
+        access_url = f"http://{hostname}:{port}/?token={AUTH_TOKEN}"
+        print(f"\n  Auth Mode: Token")
+        print(f"\n  Access URL:\n")
+        print(f"    {access_url}")
+        print(f"\n  Scan QR code to connect:\n")
+        print_qr_code(access_url)
+
     print("\n" + "=" * 50 + "\n")
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
