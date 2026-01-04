@@ -661,6 +661,135 @@
             debugEl.scrollTop = debugEl.scrollHeight;
         }
 
+        // Idle detection and notification settings
+        const IDLE_TIMEOUT = 3000; // 3 seconds of no data = waiting state
+        let lastDataTime = Date.now();
+        let idleTimer = null;
+        let isIdle = false;
+        let wasActive = false; // Track if there was activity before going idle
+
+        // Request notification permission
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+
+        // Audio context for notification sound
+        let audioContext = null;
+        function getAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        // Initialize audio context on first user interaction (required for iOS)
+        function initAudioOnInteraction() {
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+                // Create a silent buffer to unlock audio
+                const buffer = ctx.createBuffer(1, 1, 22050);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
+            } catch (e) {
+                console.log('Audio init:', e);
+            }
+            // Remove listeners after first interaction
+            document.removeEventListener('touchstart', initAudioOnInteraction);
+            document.removeEventListener('click', initAudioOnInteraction);
+        }
+        document.addEventListener('touchstart', initAudioOnInteraction, { once: true });
+        document.addEventListener('click', initAudioOnInteraction, { once: true });
+
+        // Play notification sound (pleasant chime)
+        function playNotificationSound() {
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+
+                const now = ctx.currentTime;
+
+                // Create a pleasant two-tone chime
+                const frequencies = [523.25, 659.25]; // C5 and E5
+
+                frequencies.forEach((freq, i) => {
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(freq, now);
+
+                    // Envelope: quick attack, gradual decay
+                    gainNode.gain.setValueAtTime(0, now + i * 0.15);
+                    gainNode.gain.linearRampToValueAtTime(0.3, now + i * 0.15 + 0.05);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.5);
+
+                    oscillator.start(now + i * 0.15);
+                    oscillator.stop(now + i * 0.15 + 0.5);
+                });
+            } catch (e) {
+                console.log('Could not play notification sound:', e);
+            }
+        }
+
+        // Show browser notification
+        function showIdleNotification() {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                const host = window.NAGI_HOST || 'Nagi';
+                const notification = new Notification('Terminal Ready', {
+                    body: `${host} is waiting for input`,
+                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⌨️</text></svg>',
+                    tag: 'nagi-idle', // Prevent duplicate notifications
+                    requireInteraction: false
+                });
+
+                // Auto-close notification after 5 seconds
+                setTimeout(() => notification.close(), 5000);
+
+                // Focus window when notification is clicked
+                notification.onclick = () => {
+                    window.focus();
+                    notification.close();
+                };
+            }
+        }
+
+        // Called when terminal goes idle (waiting state)
+        function onTerminalIdle() {
+            if (!isIdle && wasActive) {
+                isIdle = true;
+                log('Terminal is now waiting for input');
+
+                // Only notify if page is not visible (user is in another tab/app)
+                if (document.hidden) {
+                    playNotificationSound();
+                    showIdleNotification();
+                }
+            }
+        }
+
+        // Called when terminal receives data (active state)
+        function onTerminalActive() {
+            isIdle = false;
+            wasActive = true;
+            lastDataTime = Date.now();
+
+            // Reset idle timer
+            if (idleTimer) {
+                clearTimeout(idleTimer);
+            }
+            idleTimer = setTimeout(onTerminalIdle, IDLE_TIMEOUT);
+        }
+
         const statusDot = document.getElementById('statusDot');
         const statusText = document.getElementById('statusText');
 
@@ -774,6 +903,9 @@
                 };
 
                 ws.onmessage = (event) => {
+                    // Track terminal activity for idle detection
+                    onTerminalActive();
+
                     if (event.data instanceof ArrayBuffer) {
                         const decoder = new TextDecoder();
                         term.write(decoder.decode(event.data));
@@ -1063,8 +1195,15 @@
 
         document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && ws && ws.readyState !== WebSocket.OPEN) {
-                connect();
+            if (document.visibilityState === 'visible') {
+                // Reset idle state when returning to the page
+                isIdle = false;
+                wasActive = false;
+
+                // Reconnect if disconnected
+                if (ws && ws.readyState !== WebSocket.OPEN) {
+                    connect();
+                }
             }
         });
 
