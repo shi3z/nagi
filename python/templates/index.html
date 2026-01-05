@@ -653,12 +653,230 @@
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
     <script>
+        const NAGI_VERSION = '1.1.20';
+        console.log(`Nagi Terminal v${NAGI_VERSION}`);
+
         const debugEl = document.getElementById('debug');
         function log(msg) {
             console.log(msg);
             debugEl.style.display = 'block';
             debugEl.textContent += msg + '\n';
             debugEl.scrollTop = debugEl.scrollHeight;
+        }
+
+        // Idle detection and notification settings
+        const IDLE_TIMEOUT = 3000; // 3 seconds of no display change = waiting state
+        let idleCheckInterval = null;
+        let lastDisplayContent = '';
+        let lastChangeTime = Date.now();
+        let isIdle = false;
+        let wasActive = false; // Track if there was activity before going idle
+        let notificationShown = false; // Only notify once until user interacts
+        let notificationSupported = false;
+
+        // Get terminal display content as string for comparison
+        function getTerminalContent() {
+            if (!term || !term.buffer || !term.buffer.active) return '';
+            const buffer = term.buffer.active;
+            let content = '';
+            for (let i = 0; i < buffer.length; i++) {
+                const line = buffer.getLine(i);
+                if (line) {
+                    content += line.translateToString(true) + '\n';
+                }
+            }
+            return content;
+        }
+
+        // Check if terminal display has changed
+        function checkDisplayChange() {
+            const currentContent = getTerminalContent();
+            const contentLength = currentContent.length;
+
+            if (currentContent !== lastDisplayContent) {
+                // Display changed
+                const prevLength = lastDisplayContent.length;
+                lastDisplayContent = currentContent;
+                lastChangeTime = Date.now();
+
+                console.log(`Display changed: ${prevLength} -> ${contentLength} chars`);
+
+                if (isIdle) {
+                    console.log('Was idle, now active');
+                }
+                isIdle = false;
+                wasActive = true;
+                stopTitleFlash();
+            } else {
+                // Display hasn't changed
+                const idleTime = Date.now() - lastChangeTime;
+
+                if (!isIdle && wasActive && idleTime >= IDLE_TIMEOUT) {
+                    // Just became idle
+                    isIdle = true;
+                    console.log(`*** IDLE DETECTED *** (no change for ${idleTime}ms, content: ${contentLength} chars)`);
+
+                    // Only notify once until user interacts
+                    if (!notificationShown) {
+                        notificationShown = true;
+                        playNotificationSound();
+                        showIdleNotification();
+                    }
+                }
+            }
+        }
+
+        // Request notification permission
+        if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+                notificationSupported = true;
+                console.log('Notifications: granted');
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then(permission => {
+                    notificationSupported = (permission === 'granted');
+                    console.log('Notifications:', permission);
+                });
+            } else {
+                console.log('Notifications: denied');
+            }
+        } else {
+            console.log('Notifications: not supported (iOS Safari)');
+        }
+
+        // Audio context for notification sound
+        let audioContext = null;
+        function getAudioContext() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        // Initialize audio context on first user interaction (required for iOS)
+        function initAudioOnInteraction() {
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+                // Create a silent buffer to unlock audio
+                const buffer = ctx.createBuffer(1, 1, 22050);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
+            } catch (e) {
+                console.log('Audio init:', e);
+            }
+            // Remove listeners after first interaction
+            document.removeEventListener('touchstart', initAudioOnInteraction);
+            document.removeEventListener('click', initAudioOnInteraction);
+        }
+        document.addEventListener('touchstart', initAudioOnInteraction, { once: true });
+        document.addEventListener('click', initAudioOnInteraction, { once: true });
+
+        // Play notification sound (pleasant chime)
+        function playNotificationSound() {
+            try {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') {
+                    ctx.resume();
+                }
+
+                const now = ctx.currentTime;
+
+                // Create a pleasant two-tone chime
+                const frequencies = [65.41, 82.41]; // C2 and E2 (deep tone)
+
+                frequencies.forEach((freq, i) => {
+                    const oscillator = ctx.createOscillator();
+                    const gainNode = ctx.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(ctx.destination);
+
+                    oscillator.type = 'sine';
+                    oscillator.frequency.setValueAtTime(freq, now);
+
+                    // Envelope: quick attack, gradual decay
+                    gainNode.gain.setValueAtTime(0, now + i * 0.15);
+                    gainNode.gain.linearRampToValueAtTime(0.3, now + i * 0.15 + 0.05);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, now + i * 0.15 + 0.5);
+
+                    oscillator.start(now + i * 0.15);
+                    oscillator.stop(now + i * 0.15 + 0.5);
+                });
+            } catch (e) {
+                console.log('Could not play notification sound:', e);
+            }
+        }
+
+        // Show browser notification
+        let titleFlashInterval = null;
+        let originalTitle = '';
+
+        function showIdleNotification() {
+            const host = window.NAGI_HOST || 'Nagi';
+
+            // Try Web Notification API (not supported on iOS Safari)
+            if (notificationSupported) {
+                try {
+                    const notification = new Notification('Terminal Ready', {
+                        body: `${host} is waiting for input`,
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⌨️</text></svg>',
+                        tag: 'nagi-idle',
+                        requireInteraction: false
+                    });
+
+                    setTimeout(() => notification.close(), 5000);
+
+                    notification.onclick = () => {
+                        window.focus();
+                        notification.close();
+                    };
+                    console.log('Notification shown');
+                } catch (e) {
+                    console.log('Notification error:', e);
+                }
+            }
+
+            // Flash title for all browsers (works on iOS too)
+            if (!titleFlashInterval) {
+                originalTitle = document.title;
+                let flash = true;
+                titleFlashInterval = setInterval(() => {
+                    document.title = flash ? '🔔 Terminal Ready!' : originalTitle;
+                    flash = !flash;
+                }, 1000);
+                console.log('Title flash started');
+            }
+        }
+
+        function stopTitleFlash() {
+            if (titleFlashInterval) {
+                clearInterval(titleFlashInterval);
+                titleFlashInterval = null;
+                if (originalTitle) {
+                    document.title = originalTitle;
+                }
+            }
+        }
+
+        // Start idle detection interval (check every 500ms)
+        function startIdleDetection() {
+            if (!idleCheckInterval) {
+                lastDisplayContent = getTerminalContent();
+                lastChangeTime = Date.now();
+                idleCheckInterval = setInterval(checkDisplayChange, 500);
+                console.log(`Idle detection started (initial content: ${lastDisplayContent.length} chars, timeout: ${IDLE_TIMEOUT}ms)`);
+            }
+        }
+
+        function stopIdleDetection() {
+            if (idleCheckInterval) {
+                clearInterval(idleCheckInterval);
+                idleCheckInterval = null;
+            }
         }
 
         const statusDot = document.getElementById('statusDot');
@@ -759,12 +977,15 @@
                     const host = window.NAGI_HOST || 'Nagi';
                     const ip = window.NAGI_IP || '';
                     document.title = ip ? `${host} (${ip}) - Nagi` : `${host} - Nagi`;
+                    // Start idle detection
+                    startIdleDetection();
                 };
 
                 ws.onclose = (e) => {
                     log('WebSocket closed: ' + e.code);
                     statusDot.classList.remove('connected');
                     statusText.textContent = 'Disconnected';
+                    stopIdleDetection();
                     setTimeout(connect, 2000);
                 };
 
@@ -792,6 +1013,8 @@
 
         function send(data) {
             if (ws && ws.readyState === WebSocket.OPEN) {
+                // Reset notification flag on user interaction
+                notificationShown = false;
                 ws.send(typeof data === 'string' ? data : new Uint8Array(data));
             }
         }
@@ -1063,8 +1286,20 @@
 
         document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible' && ws && ws.readyState !== WebSocket.OPEN) {
-                connect();
+            if (document.visibilityState === 'visible') {
+                // Reset idle state when returning to the page
+                isIdle = false;
+                wasActive = false;
+                lastChangeTime = Date.now();
+                lastDisplayContent = getTerminalContent();
+
+                // Stop title flash
+                stopTitleFlash();
+
+                // Reconnect if disconnected
+                if (ws && ws.readyState !== WebSocket.OPEN) {
+                    connect();
+                }
             }
         });
 

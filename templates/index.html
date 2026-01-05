@@ -653,6 +653,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
     <script>
+        const NAGI_VERSION = '1.1.20';
+        console.log(`Nagi Terminal v${NAGI_VERSION}`);
+
         const debugEl = document.getElementById('debug');
         function log(msg) {
             console.log(msg);
@@ -662,15 +665,82 @@
         }
 
         // Idle detection and notification settings
-        const IDLE_TIMEOUT = 3000; // 3 seconds of no data = waiting state
-        let lastDataTime = Date.now();
-        let idleTimer = null;
+        const IDLE_TIMEOUT = 3000; // 3 seconds of no display change = waiting state
+        let idleCheckInterval = null;
+        let lastDisplayContent = '';
+        let lastChangeTime = Date.now();
         let isIdle = false;
         let wasActive = false; // Track if there was activity before going idle
+        let notificationShown = false; // Only notify once until user interacts
+        let notificationSupported = false;
+
+        // Get terminal display content as string for comparison
+        function getTerminalContent() {
+            if (!term || !term.buffer || !term.buffer.active) return '';
+            const buffer = term.buffer.active;
+            let content = '';
+            for (let i = 0; i < buffer.length; i++) {
+                const line = buffer.getLine(i);
+                if (line) {
+                    content += line.translateToString(true) + '\n';
+                }
+            }
+            return content;
+        }
+
+        // Check if terminal display has changed
+        function checkDisplayChange() {
+            const currentContent = getTerminalContent();
+            const contentLength = currentContent.length;
+
+            if (currentContent !== lastDisplayContent) {
+                // Display changed
+                const prevLength = lastDisplayContent.length;
+                lastDisplayContent = currentContent;
+                lastChangeTime = Date.now();
+
+                console.log(`Display changed: ${prevLength} -> ${contentLength} chars`);
+
+                if (isIdle) {
+                    console.log('Was idle, now active');
+                }
+                isIdle = false;
+                wasActive = true;
+                stopTitleFlash();
+            } else {
+                // Display hasn't changed
+                const idleTime = Date.now() - lastChangeTime;
+
+                if (!isIdle && wasActive && idleTime >= IDLE_TIMEOUT) {
+                    // Just became idle
+                    isIdle = true;
+                    console.log(`*** IDLE DETECTED *** (no change for ${idleTime}ms, content: ${contentLength} chars)`);
+
+                    // Only notify once until user interacts
+                    if (!notificationShown) {
+                        notificationShown = true;
+                        playNotificationSound();
+                        showIdleNotification();
+                    }
+                }
+            }
+        }
 
         // Request notification permission
-        if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission();
+        if ('Notification' in window) {
+            if (Notification.permission === 'granted') {
+                notificationSupported = true;
+                console.log('Notifications: granted');
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then(permission => {
+                    notificationSupported = (permission === 'granted');
+                    console.log('Notifications:', permission);
+                });
+            } else {
+                console.log('Notifications: denied');
+            }
+        } else {
+            console.log('Notifications: not supported (iOS Safari)');
         }
 
         // Audio context for notification sound
@@ -716,7 +786,7 @@
                 const now = ctx.currentTime;
 
                 // Create a pleasant two-tone chime
-                const frequencies = [523.25, 659.25]; // C5 and E5
+                const frequencies = [65.41, 82.41]; // C2 and E2 (deep tone)
 
                 frequencies.forEach((freq, i) => {
                     const oscillator = ctx.createOscillator();
@@ -742,52 +812,71 @@
         }
 
         // Show browser notification
+        let titleFlashInterval = null;
+        let originalTitle = '';
+
         function showIdleNotification() {
-            if ('Notification' in window && Notification.permission === 'granted') {
-                const host = window.NAGI_HOST || 'Nagi';
-                const notification = new Notification('Terminal Ready', {
-                    body: `${host} is waiting for input`,
-                    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⌨️</text></svg>',
-                    tag: 'nagi-idle', // Prevent duplicate notifications
-                    requireInteraction: false
-                });
+            const host = window.NAGI_HOST || 'Nagi';
 
-                // Auto-close notification after 5 seconds
-                setTimeout(() => notification.close(), 5000);
+            // Try Web Notification API (not supported on iOS Safari)
+            if (notificationSupported) {
+                try {
+                    const notification = new Notification('Terminal Ready', {
+                        body: `${host} is waiting for input`,
+                        icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">⌨️</text></svg>',
+                        tag: 'nagi-idle',
+                        requireInteraction: false
+                    });
 
-                // Focus window when notification is clicked
-                notification.onclick = () => {
-                    window.focus();
-                    notification.close();
-                };
+                    setTimeout(() => notification.close(), 5000);
+
+                    notification.onclick = () => {
+                        window.focus();
+                        notification.close();
+                    };
+                    console.log('Notification shown');
+                } catch (e) {
+                    console.log('Notification error:', e);
+                }
+            }
+
+            // Flash title for all browsers (works on iOS too)
+            if (!titleFlashInterval) {
+                originalTitle = document.title;
+                let flash = true;
+                titleFlashInterval = setInterval(() => {
+                    document.title = flash ? '🔔 Terminal Ready!' : originalTitle;
+                    flash = !flash;
+                }, 1000);
+                console.log('Title flash started');
             }
         }
 
-        // Called when terminal goes idle (waiting state)
-        function onTerminalIdle() {
-            if (!isIdle && wasActive) {
-                isIdle = true;
-                log('Terminal is now waiting for input');
-
-                // Only notify if page is not visible (user is in another tab/app)
-                if (document.hidden) {
-                    playNotificationSound();
-                    showIdleNotification();
+        function stopTitleFlash() {
+            if (titleFlashInterval) {
+                clearInterval(titleFlashInterval);
+                titleFlashInterval = null;
+                if (originalTitle) {
+                    document.title = originalTitle;
                 }
             }
         }
 
-        // Called when terminal receives data (active state)
-        function onTerminalActive() {
-            isIdle = false;
-            wasActive = true;
-            lastDataTime = Date.now();
-
-            // Reset idle timer
-            if (idleTimer) {
-                clearTimeout(idleTimer);
+        // Start idle detection interval (check every 500ms)
+        function startIdleDetection() {
+            if (!idleCheckInterval) {
+                lastDisplayContent = getTerminalContent();
+                lastChangeTime = Date.now();
+                idleCheckInterval = setInterval(checkDisplayChange, 500);
+                console.log(`Idle detection started (initial content: ${lastDisplayContent.length} chars, timeout: ${IDLE_TIMEOUT}ms)`);
             }
-            idleTimer = setTimeout(onTerminalIdle, IDLE_TIMEOUT);
+        }
+
+        function stopIdleDetection() {
+            if (idleCheckInterval) {
+                clearInterval(idleCheckInterval);
+                idleCheckInterval = null;
+            }
         }
 
         const statusDot = document.getElementById('statusDot');
@@ -888,12 +977,15 @@
                     const host = window.NAGI_HOST || 'Nagi';
                     const ip = window.NAGI_IP || '';
                     document.title = ip ? `${host} (${ip}) - Nagi` : `${host} - Nagi`;
+                    // Start idle detection
+                    startIdleDetection();
                 };
 
                 ws.onclose = (e) => {
                     log('WebSocket closed: ' + e.code);
                     statusDot.classList.remove('connected');
                     statusText.textContent = 'Disconnected';
+                    stopIdleDetection();
                     setTimeout(connect, 2000);
                 };
 
@@ -903,9 +995,6 @@
                 };
 
                 ws.onmessage = (event) => {
-                    // Track terminal activity for idle detection
-                    onTerminalActive();
-
                     if (event.data instanceof ArrayBuffer) {
                         const decoder = new TextDecoder();
                         term.write(decoder.decode(event.data));
@@ -924,6 +1013,8 @@
 
         function send(data) {
             if (ws && ws.readyState === WebSocket.OPEN) {
+                // Reset notification flag on user interaction
+                notificationShown = false;
                 ws.send(typeof data === 'string' ? data : new Uint8Array(data));
             }
         }
@@ -1199,6 +1290,11 @@
                 // Reset idle state when returning to the page
                 isIdle = false;
                 wasActive = false;
+                lastChangeTime = Date.now();
+                lastDisplayContent = getTerminalContent();
+
+                // Stop title flash
+                stopTitleFlash();
 
                 // Reconnect if disconnected
                 if (ws && ws.readyState !== WebSocket.OPEN) {
