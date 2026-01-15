@@ -626,7 +626,8 @@ def print_qr_code(url: str):
 
 if __name__ == "__main__":
     import uvicorn
-    port = config.get("port", 8765)
+    # Support NAGI_PORT environment variable (set by CLI)
+    port = int(os.environ.get("NAGI_PORT", 0)) or config.get("port", 8765)
     hostname = get_hostname()
 
     print("\n" + "=" * 50)
