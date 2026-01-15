@@ -433,9 +433,368 @@
                 display: none !important;
             }
         }
+
+        /* File Browser Styles */
+        .filer-toggle-btn {
+            position: fixed;
+            top: 8px;
+            right: 8px;
+            background: #0f3460;
+            color: #e94560;
+            border: 1px solid #e94560;
+            border-radius: 6px;
+            padding: 8px 12px;
+            cursor: pointer;
+            z-index: 499;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .filer-toggle-btn:hover, .filer-toggle-btn:active {
+            background: #e94560;
+            color: #16213e;
+        }
+
+        .filer-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 300px;
+            height: 100%;
+            background: #16213e;
+            border-left: 1px solid #e94560;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            z-index: 500;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .filer-panel.visible {
+            transform: translateX(0);
+        }
+
+        .filer-header {
+            padding: 12px;
+            background: #0f3460;
+            border-bottom: 1px solid #e94560;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .filer-header h3 {
+            margin: 0;
+            color: #e94560;
+            font-size: 14px;
+            flex: 1;
+        }
+
+        .filer-header .btn {
+            padding: 6px 10px;
+            min-width: auto;
+        }
+
+        .filer-path {
+            padding: 8px 12px;
+            background: #1a1a2e;
+            font-size: 11px;
+            color: #888;
+            word-break: break-all;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .filer-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 0;
+        }
+
+        .filer-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 12px;
+            cursor: pointer;
+            gap: 10px;
+            transition: background 0.15s;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .filer-item:hover {
+            background: #0f3460;
+        }
+
+        .filer-item.directory {
+            color: #4fc3f7;
+        }
+
+        .filer-item.file {
+            color: #eee;
+        }
+
+        .filer-item .icon {
+            font-size: 16px;
+            width: 24px;
+            text-align: center;
+        }
+
+        .filer-item .name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-size: 13px;
+        }
+
+        .filer-item .size {
+            font-size: 11px;
+            color: #888;
+        }
+
+        .filer-footer {
+            padding: 8px 12px;
+            border-top: 1px solid #0f3460;
+            background: #0a0a1a;
+        }
+
+        .filer-footer label {
+            font-size: 11px;
+            color: #888;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        /* File Viewer Modal */
+        .file-viewer-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1001;
+            flex-direction: column;
+        }
+
+        .file-viewer-overlay.visible {
+            display: flex;
+        }
+
+        .file-viewer-header {
+            padding: 8px 16px;
+            background: #16213e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #e94560;
+        }
+
+        .file-viewer-header .filename {
+            flex: 1;
+            color: #e94560;
+            font-weight: bold;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .file-viewer-header .btn {
+            padding: 6px 12px;
+            min-width: auto;
+        }
+
+        .file-viewer-content {
+            flex: 1;
+            overflow: auto;
+            padding: 0;
+            background: #1a1a2e;
+        }
+
+        .file-viewer-content pre {
+            margin: 0;
+            padding: 16px;
+            font-family: Menlo, Monaco, "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #eee;
+        }
+
+        .file-viewer-content code {
+            background: transparent !important;
+            font-family: Menlo, Monaco, "Courier New", monospace;
+            color: #eee;
+        }
+
+        /* Image Viewer Modal */
+        .image-viewer-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1001;
+            flex-direction: column;
+        }
+
+        .image-viewer-overlay.visible {
+            display: flex;
+        }
+
+        .image-viewer-header {
+            padding: 8px 16px;
+            background: #16213e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #e94560;
+        }
+
+        .image-viewer-header .filename {
+            flex: 1;
+            color: #e94560;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .image-viewer-header .btn {
+            padding: 6px 12px;
+            min-width: auto;
+        }
+
+        .image-viewer-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            overflow: auto;
+            background: #000;
+        }
+
+        .image-viewer-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .image-viewer-container.fullscreen img {
+            max-width: none;
+            max-height: none;
+        }
+
+        /* Video Player Modal */
+        .video-player-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 1001;
+            flex-direction: column;
+        }
+
+        .video-player-overlay.visible {
+            display: flex;
+        }
+
+        .video-player-header {
+            padding: 8px 16px;
+            background: #16213e;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-bottom: 1px solid #e94560;
+        }
+
+        .video-player-header .filename {
+            flex: 1;
+            color: #e94560;
+            font-weight: bold;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .video-player-header .btn {
+            padding: 6px 12px;
+            min-width: auto;
+        }
+
+        .video-player-container {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            background: #000;
+        }
+
+        .video-player-container video {
+            max-width: 100%;
+            max-height: 100%;
+        }
+
+        .video-player-container.fullscreen video {
+            max-width: none;
+            max-height: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Filer open state */
+        #app.filer-open {
+            margin-right: 300px;
+            transition: margin-right 0.3s ease;
+        }
+
+        /* Mobile: filer takes full width */
+        @media (max-width: 480px) {
+            .filer-panel {
+                width: 100%;
+            }
+            #app.filer-open {
+                margin-right: 0;
+            }
+            .filer-toggle-btn {
+                padding: 8px 6px;
+                font-size: 11px;
+            }
+        }
     </style>
+    <!-- highlight.js for syntax highlighting -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
 </head>
 <body>
+    <!-- File Browser Toggle Button -->
+    <button class="filer-toggle-btn" id="filerToggleBtn">Files</button>
+
+    <!-- File Browser Side Panel -->
+    <div class="filer-panel" id="filerPanel">
+        <div class="filer-header">
+            <button class="btn" id="filerBackBtn">↑</button>
+            <h3>File Browser</h3>
+            <button class="btn" id="filerCloseBtn">×</button>
+        </div>
+        <div class="filer-path" id="filerPath">/</div>
+        <div class="filer-list" id="filerList"></div>
+        <div class="filer-footer">
+            <label>
+                <input type="checkbox" id="showHiddenFiles"> Show hidden files
+            </label>
+        </div>
+    </div>
+
     <div id="app">
         <div class="status-bar">
             <div class="status-indicator">
@@ -649,9 +1008,50 @@
         </div>
     </div>
 
+    <!-- File Viewer Modal -->
+    <div class="file-viewer-overlay" id="fileViewerOverlay">
+        <div class="file-viewer-header">
+            <span class="filename" id="fileViewerName">filename.py</span>
+            <button class="btn" id="fileViewerCloseBtn">×</button>
+        </div>
+        <div class="file-viewer-content" id="fileViewerContent">
+            <pre><code id="fileViewerCode"></code></pre>
+        </div>
+    </div>
+
+    <!-- Video Player Modal -->
+    <div class="video-player-overlay" id="videoPlayerOverlay">
+        <div class="video-player-header">
+            <span class="filename" id="videoPlayerName">video.mp4</span>
+            <button class="btn" id="videoFullscreenBtn">⛶</button>
+            <button class="btn" id="videoPlayerCloseBtn">×</button>
+        </div>
+        <div class="video-player-container" id="videoPlayerContainer">
+            <video id="videoPlayer" controls></video>
+        </div>
+    </div>
+
+    <!-- Image Viewer Modal -->
+    <div class="image-viewer-overlay" id="imageViewerOverlay">
+        <div class="image-viewer-header">
+            <span class="filename" id="imageViewerName">image.png</span>
+            <button class="btn" id="imageFullscreenBtn">⛶</button>
+            <button class="btn" id="imageViewerCloseBtn">×</button>
+        </div>
+        <div class="image-viewer-container" id="imageViewerContainer">
+            <img id="imageViewer" src="" alt="">
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-web-links@0.11.0/lib/addon-web-links.min.js"></script>
+    <!-- highlight.js with all common languages -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/python.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/go.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/rust.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/typescript.min.js"></script>
     <script>
         const NAGI_VERSION = '1.1.20';
         console.log(`Nagi Terminal v${NAGI_VERSION}`);
@@ -1316,6 +1716,367 @@
             if (tmuxPanel && tmuxPanel.classList.contains('visible')) {
                 if (!tmuxPanel.contains(e.target) && e.target !== tmuxBtn && e.target !== tmuxBtn2) {
                     tmuxPanel.classList.remove('visible');
+                }
+            }
+        });
+
+        // ========================================
+        // File Browser Functionality
+        // ========================================
+
+        const filerPanel = document.getElementById('filerPanel');
+        const filerToggleBtn = document.getElementById('filerToggleBtn');
+        const filerCloseBtn = document.getElementById('filerCloseBtn');
+        const filerBackBtn = document.getElementById('filerBackBtn');
+        const filerPath = document.getElementById('filerPath');
+        const filerList = document.getElementById('filerList');
+        const showHiddenFiles = document.getElementById('showHiddenFiles');
+
+        const fileViewerOverlay = document.getElementById('fileViewerOverlay');
+        const fileViewerName = document.getElementById('fileViewerName');
+        const fileViewerCode = document.getElementById('fileViewerCode');
+        const fileViewerCloseBtn = document.getElementById('fileViewerCloseBtn');
+
+        const videoPlayerOverlay = document.getElementById('videoPlayerOverlay');
+        const videoPlayerName = document.getElementById('videoPlayerName');
+        const videoPlayer = document.getElementById('videoPlayer');
+        const videoPlayerContainer = document.getElementById('videoPlayerContainer');
+        const videoPlayerCloseBtn = document.getElementById('videoPlayerCloseBtn');
+        const videoFullscreenBtn = document.getElementById('videoFullscreenBtn');
+
+        const imageViewerOverlay = document.getElementById('imageViewerOverlay');
+        const imageViewerName = document.getElementById('imageViewerName');
+        const imageViewer = document.getElementById('imageViewer');
+        const imageViewerContainer = document.getElementById('imageViewerContainer');
+        const imageViewerCloseBtn = document.getElementById('imageViewerCloseBtn');
+        const imageFullscreenBtn = document.getElementById('imageFullscreenBtn');
+
+        let currentFilerPath = null;
+
+        // Extension to highlight.js language mapping
+        const LANG_MAP = {
+            '.py': 'python',
+            '.js': 'javascript',
+            '.ts': 'typescript',
+            '.jsx': 'javascript',
+            '.tsx': 'typescript',
+            '.json': 'json',
+            '.yaml': 'yaml',
+            '.yml': 'yaml',
+            '.sh': 'bash',
+            '.bash': 'bash',
+            '.css': 'css',
+            '.scss': 'css',
+            '.html': 'xml',
+            '.xml': 'xml',
+            '.go': 'go',
+            '.rs': 'rust',
+            '.c': 'c',
+            '.cpp': 'cpp',
+            '.h': 'c',
+            '.hpp': 'cpp',
+            '.java': 'java',
+            '.sql': 'sql',
+            '.md': 'markdown'
+        };
+
+        // Video extensions
+        const VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v'];
+
+        // Image extensions
+        const IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp'];
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === null || bytes === undefined) return '';
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        // Get file icon
+        function getFileIcon(item) {
+            if (item.type === 'directory') return '\u{1F4C1}';
+
+            const ext = item.extension;
+            if (VIDEO_EXTENSIONS.includes(ext)) return '\u{1F3AC}';
+            if (IMAGE_EXTENSIONS.includes(ext)) return '\u{1F5BC}';
+            if (['.py'].includes(ext)) return '\u{1F40D}';
+            if (['.js', '.ts', '.jsx', '.tsx'].includes(ext)) return '\u{1F4DC}';
+            if (['.json', '.yaml', '.yml', '.toml'].includes(ext)) return '\u2699';
+            if (['.md', '.txt'].includes(ext)) return '\u{1F4DD}';
+            if (['.html', '.css', '.scss'].includes(ext)) return '\u{1F310}';
+            if (['.sh', '.bash'].includes(ext)) return '\u{1F4BB}';
+            return '\u{1F4C4}';
+        }
+
+        // Load files from API
+        async function loadFiles(path = null) {
+            const token = window.NAGI_TOKEN || '';
+            const showHidden = showHiddenFiles.checked;
+
+            let url = `/api/files?token=${encodeURIComponent(token)}&show_hidden=${showHidden}`;
+            if (path) {
+                url += `&path=${encodeURIComponent(path)}`;
+            }
+
+            try {
+                filerList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Loading...</div>';
+
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const error = await response.json();
+                    filerList.innerHTML = `<div style="padding: 20px; text-align: center; color: #e94560;">Error: ${error.error}</div>`;
+                    return;
+                }
+
+                const data = await response.json();
+                currentFilerPath = data.path;
+                filerPath.textContent = data.path;
+
+                // Render file list
+                filerList.innerHTML = '';
+
+                if (data.items.length === 0) {
+                    filerList.innerHTML = '<div style="padding: 20px; text-align: center; color: #888;">Empty directory</div>';
+                    return;
+                }
+
+                data.items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = `filer-item ${item.type}`;
+                    div.innerHTML = `
+                        <span class="icon">${getFileIcon(item)}</span>
+                        <span class="name">${escapeHtml(item.name)}</span>
+                        <span class="size">${formatFileSize(item.size)}</span>
+                    `;
+
+                    div.addEventListener('click', () => {
+                        if (item.type === 'directory') {
+                            loadFiles(currentFilerPath + '/' + item.name);
+                        } else if (VIDEO_EXTENSIONS.includes(item.extension)) {
+                            openVideoPlayer(currentFilerPath + '/' + item.name, item.name);
+                        } else if (IMAGE_EXTENSIONS.includes(item.extension)) {
+                            openImageViewer(currentFilerPath + '/' + item.name, item.name);
+                        } else {
+                            openFileViewer(currentFilerPath + '/' + item.name, item.name, item.extension);
+                        }
+                    });
+
+                    filerList.appendChild(div);
+                });
+
+                // Update back button state
+                filerBackBtn.disabled = !data.parent;
+                filerBackBtn.style.opacity = data.parent ? '1' : '0.5';
+
+            } catch (error) {
+                console.error('Error loading files:', error);
+                filerList.innerHTML = '<div style="padding: 20px; text-align: center; color: #e94560;">Failed to load files</div>';
+            }
+        }
+
+        // Escape HTML
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Open file viewer
+        async function openFileViewer(path, name, extension) {
+            const token = window.NAGI_TOKEN || '';
+            const url = `/api/file?token=${encodeURIComponent(token)}&path=${encodeURIComponent(path)}`;
+
+            try {
+                fileViewerName.textContent = name;
+                fileViewerCode.textContent = 'Loading...';
+                fileViewerCode.className = '';
+                fileViewerOverlay.classList.add('visible');
+
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const error = await response.json();
+                    fileViewerCode.textContent = `Error: ${error.error}`;
+                    return;
+                }
+
+                const data = await response.json();
+
+                // Set code content
+                fileViewerCode.textContent = data.content;
+                fileViewerCode.className = '';
+
+                // Set language for highlight.js
+                const lang = LANG_MAP[extension];
+                if (lang && hljs.getLanguage(lang)) {
+                    fileViewerCode.classList.add(`language-${lang}`);
+                    hljs.highlightElement(fileViewerCode);
+                }
+
+            } catch (error) {
+                console.error('Error loading file:', error);
+                fileViewerCode.textContent = `Failed to load file: ${error.message || error}`;
+            }
+        }
+
+        // Open video player
+        function openVideoPlayer(path, name) {
+            const token = window.NAGI_TOKEN || '';
+            const url = `/api/video?token=${encodeURIComponent(token)}&path=${encodeURIComponent(path)}`;
+
+            videoPlayerName.textContent = name;
+            videoPlayer.src = url;
+            videoPlayerOverlay.classList.add('visible');
+            videoPlayer.play().catch(() => {});
+        }
+
+        // Close video player
+        function closeVideoPlayer() {
+            videoPlayer.pause();
+            videoPlayer.src = '';
+            videoPlayerOverlay.classList.remove('visible');
+            videoPlayerContainer.classList.remove('fullscreen');
+        }
+
+        // Open image viewer
+        function openImageViewer(path, name) {
+            const token = window.NAGI_TOKEN || '';
+            const url = `/api/image?token=${encodeURIComponent(token)}&path=${encodeURIComponent(path)}`;
+
+            imageViewerName.textContent = name;
+            imageViewer.src = url;
+            imageViewerOverlay.classList.add('visible');
+            imageViewerContainer.classList.remove('fullscreen');
+        }
+
+        // Close image viewer
+        function closeImageViewer() {
+            imageViewer.src = '';
+            imageViewerOverlay.classList.remove('visible');
+            imageViewerContainer.classList.remove('fullscreen');
+        }
+
+        // Toggle fullscreen for video
+        function toggleVideoFullscreen() {
+            if (videoPlayerOverlay.requestFullscreen) {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    videoPlayerOverlay.requestFullscreen();
+                }
+            } else {
+                videoPlayerContainer.classList.toggle('fullscreen');
+            }
+        }
+
+        // Toggle fullscreen for image
+        function toggleImageFullscreen() {
+            if (imageViewerOverlay.requestFullscreen) {
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                } else {
+                    imageViewerOverlay.requestFullscreen();
+                }
+            } else {
+                imageViewerContainer.classList.toggle('fullscreen');
+            }
+        }
+
+        // Event listeners for file browser
+        filerToggleBtn.addEventListener('click', () => {
+            filerPanel.classList.add('visible');
+            document.getElementById('app').classList.add('filer-open');
+            if (!currentFilerPath) {
+                loadFiles();
+            }
+            setTimeout(fitTerminal, 300);
+        });
+
+        filerCloseBtn.addEventListener('click', () => {
+            filerPanel.classList.remove('visible');
+            document.getElementById('app').classList.remove('filer-open');
+            setTimeout(fitTerminal, 300);
+        });
+
+        filerBackBtn.addEventListener('click', () => {
+            if (currentFilerPath) {
+                const parts = currentFilerPath.split('/');
+                parts.pop();
+                const parent = parts.join('/') || '/';
+                loadFiles(parent);
+            }
+        });
+
+        showHiddenFiles.addEventListener('change', () => {
+            loadFiles(currentFilerPath);
+        });
+
+        // File viewer close
+        fileViewerCloseBtn.addEventListener('click', () => {
+            fileViewerOverlay.classList.remove('visible');
+        });
+
+        fileViewerOverlay.addEventListener('click', (e) => {
+            if (e.target === fileViewerOverlay) {
+                fileViewerOverlay.classList.remove('visible');
+            }
+        });
+
+        // Video player close
+        videoPlayerCloseBtn.addEventListener('click', closeVideoPlayer);
+        videoFullscreenBtn.addEventListener('click', toggleVideoFullscreen);
+
+        videoPlayerOverlay.addEventListener('click', (e) => {
+            if (e.target === videoPlayerOverlay || e.target === videoPlayerContainer) {
+                closeVideoPlayer();
+            }
+        });
+
+        // Image viewer close
+        imageViewerCloseBtn.addEventListener('click', closeImageViewer);
+        imageFullscreenBtn.addEventListener('click', toggleImageFullscreen);
+
+        imageViewerOverlay.addEventListener('click', (e) => {
+            if (e.target === imageViewerOverlay || e.target === imageViewerContainer) {
+                closeImageViewer();
+            }
+        });
+
+        // Double click to toggle fullscreen
+        imageViewer.addEventListener('dblclick', toggleImageFullscreen);
+        videoPlayer.addEventListener('dblclick', toggleVideoFullscreen);
+
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (fileViewerOverlay.classList.contains('visible')) {
+                    fileViewerOverlay.classList.remove('visible');
+                }
+                if (videoPlayerOverlay.classList.contains('visible')) {
+                    closeVideoPlayer();
+                }
+                if (imageViewerOverlay.classList.contains('visible')) {
+                    closeImageViewer();
+                }
+                if (filerPanel.classList.contains('visible')) {
+                    filerPanel.classList.remove('visible');
+                    document.getElementById('app').classList.remove('filer-open');
+                    setTimeout(fitTerminal, 300);
+                }
+            }
+        });
+
+        // Close filer panel when clicking outside (on mobile)
+        document.addEventListener('click', (e) => {
+            if (filerPanel.classList.contains('visible')) {
+                if (!filerPanel.contains(e.target) && e.target !== filerToggleBtn) {
+                    // Only auto-close on mobile
+                    if (window.innerWidth <= 480) {
+                        filerPanel.classList.remove('visible');
+                        document.getElementById('app').classList.remove('filer-open');
+                        setTimeout(fitTerminal, 300);
+                    }
                 }
             }
         });

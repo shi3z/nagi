@@ -5,14 +5,17 @@ import asyncio
 import fcntl
 import json
 import logging
+import mimetypes
 import os
 import pty
+import re
 import secrets
 import socket
 import struct
 import subprocess
 import sys
 import termios
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -27,7 +30,7 @@ logging.basicConfig(
 logger = logging.getLogger("nagi")
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 # Base directory for resolving paths (PyInstaller compatible)
@@ -119,6 +122,255 @@ static_dir = BASE_DIR / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# File browser configuration
+TEXT_EXTENSIONS = {
+    '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.scss',
+    '.json', '.xml', '.yaml', '.yml', '.md', '.txt', '.sh', '.bash',
+    '.c', '.cpp', '.h', '.hpp', '.java', '.go', '.rs', '.rb', '.php',
+    '.sql', '.env', '.conf', '.ini', '.toml', '.gitignore', '.dockerfile',
+    '.vue', '.svelte', '.astro', '.lock', '.csv', '.log'
+}
+VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v'}
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'}
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB for text files
+
+
+def verify_auth_with_request(token: str, request: Request) -> tuple[bool, Optional[dict]]:
+    """Verify authentication token or Tailscale IP. Returns (is_valid, user_info)."""
+    if AUTH_MODE == "tailscale":
+        # First try session token
+        user_info = verify_session(token) if token else None
+        if user_info:
+            return (True, user_info)
+        # Fall back to Tailscale IP verification
+        client_ip = request.client.host if request.client else None
+        if client_ip:
+            user_info = get_tailscale_user(client_ip)
+            if user_info and is_user_allowed(user_info):
+                return (True, user_info)
+        return (False, None)
+    else:
+        return (token == AUTH_TOKEN, None)
+
+
+@app.get("/api/files")
+async def list_files(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(None),
+    show_hidden: bool = Query(False)
+):
+    """List files in a directory."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    # Default to home directory
+    target_path = Path(path) if path else Path.home()
+
+    # Security: resolve and validate path
+    try:
+        target_path = target_path.resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not target_path.exists() or not target_path.is_dir():
+        return JSONResponse(status_code=404, content={"error": "Directory not found"})
+
+    items = []
+    try:
+        for item in sorted(target_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+            if not show_hidden and item.name.startswith('.'):
+                continue
+
+            try:
+                stat = item.stat()
+                items.append({
+                    "name": item.name,
+                    "type": "directory" if item.is_dir() else "file",
+                    "size": stat.st_size if item.is_file() else None,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "extension": item.suffix.lower() if item.is_file() else None
+                })
+            except (PermissionError, OSError):
+                # Skip files we can't access
+                continue
+    except PermissionError:
+        return JSONResponse(status_code=403, content={"error": "Permission denied"})
+
+    return {
+        "path": str(target_path),
+        "parent": str(target_path.parent) if target_path != target_path.parent else None,
+        "items": items
+    }
+
+
+@app.get("/api/file")
+async def get_file_content(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(...)
+):
+    """Get content of a text file."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    try:
+        file_path = Path(path).resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not file_path.exists() or not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    if file_path.stat().st_size > MAX_FILE_SIZE:
+        return JSONResponse(status_code=413, content={"error": "File too large (max 1MB)"})
+
+    # MIME type detection
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+
+    # Check if text file
+    is_text = (
+        file_path.suffix.lower() in TEXT_EXTENSIONS or
+        (mime_type and mime_type.startswith('text/'))
+    )
+
+    if not is_text:
+        return JSONResponse(status_code=415, content={"error": "Not a text file"})
+
+    try:
+        content = file_path.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        try:
+            content = file_path.read_text(encoding='latin-1')
+        except Exception:
+            return JSONResponse(status_code=415, content={"error": "Cannot decode file"})
+
+    return {
+        "path": str(file_path),
+        "name": file_path.name,
+        "extension": file_path.suffix.lower(),
+        "content": content,
+        "size": file_path.stat().st_size,
+        "mime_type": mime_type
+    }
+
+
+@app.get("/api/video")
+async def stream_video(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(...)
+):
+    """Stream a video file with Range request support."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    try:
+        file_path = Path(path).resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not file_path.exists() or not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    if file_path.suffix.lower() not in VIDEO_EXTENSIONS:
+        return JSONResponse(status_code=415, content={"error": "Not a video file"})
+
+    file_size = file_path.stat().st_size
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type = mime_type or 'video/mp4'
+
+    # Handle Range header
+    range_header = request.headers.get('range')
+
+    if range_header:
+        range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+        if range_match:
+            start = int(range_match.group(1))
+            end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+
+            def iter_file():
+                with open(file_path, 'rb') as f:
+                    f.seek(start)
+                    remaining = end - start + 1
+                    while remaining > 0:
+                        chunk_size = min(8192, remaining)
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_file(),
+                status_code=206,
+                media_type=mime_type,
+                headers={
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(end - start + 1)
+                }
+            )
+
+    # No Range header - return full file
+    def iter_full_file():
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                yield chunk
+
+    return StreamingResponse(
+        iter_full_file(),
+        media_type=mime_type,
+        headers={
+            'Accept-Ranges': 'bytes',
+            'Content-Length': str(file_size)
+        }
+    )
+
+
+@app.get("/api/image")
+async def get_image(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(...)
+):
+    """Serve an image file."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    try:
+        file_path = Path(path).resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not file_path.exists() or not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    if file_path.suffix.lower() not in IMAGE_EXTENSIONS:
+        return JSONResponse(status_code=415, content={"error": "Not an image file"})
+
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type = mime_type or 'image/png'
+
+    def iter_file():
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                yield chunk
+
+    return StreamingResponse(
+        iter_file(),
+        media_type=mime_type,
+        headers={
+            'Content-Length': str(file_path.stat().st_size),
+            'Cache-Control': 'max-age=3600'
+        }
+    )
+
 
 def set_winsize(fd: int, rows: int, cols: int) -> None:
     """Set terminal window size."""
@@ -187,7 +439,10 @@ async def index(request: Request, token: str = Query(None)):
     user_display = user_info.get("display_name", "") if user_info else ""
     inject_script = f'<script>window.NAGI_TOKEN="{session_token}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";window.NAGI_USER="{user_display}";</script></head>'
     html_content = html_content.replace("</head>", inject_script)
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(
+        content=html_content,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 @app.websocket("/ws")
