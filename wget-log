@@ -1,0 +1,6 @@
+--2025-12-15 08:25:10--  http://localhost:1455/auth/callback?code=ac_ap_Dr5Bb7WLjnhdRS4yH7EV_j67N95ByBycb5UKZYls.7a0tpNbWIWPKolDqcUiSG8wdwqxGwgQV10vnP9oSIaU
+Resolving localhost (localhost)... 127.0.0.1
+Connecting to localhost (localhost)|127.0.0.1|:1455... connected.
+HTTP request sent, awaiting response... 400 Bad Request
+2025-12-15 08:25:10 ERROR 400: Bad Request.
+

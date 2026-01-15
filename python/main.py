@@ -4,20 +4,33 @@
 import asyncio
 import fcntl
 import json
+import logging
+import mimetypes
 import os
 import pty
+import re
 import secrets
 import socket
 import struct
 import subprocess
 import sys
 import termios
+from datetime import datetime
 from pathlib import Path
+from typing import Optional
 
 import qrcode
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, status
-from fastapi.responses import HTMLResponse, RedirectResponse
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
+logger = logging.getLogger("nagi")
+
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request, status
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 # Base directory for resolving paths (PyInstaller compatible)
@@ -27,7 +40,7 @@ else:
     BASE_DIR = Path(__file__).parent.resolve()
 
 # Load config
-CONFIG_PATH = Path(os.environ.get("NAGI_CONFIG", "")) if os.environ.get("NAGI_CONFIG") else BASE_DIR / "config.json"
+CONFIG_PATH = BASE_DIR / "config.json"
 DEFAULT_CONFIG = {
     "startup_command": "tmux a || tmux new",
     "shell": "/bin/bash",
@@ -47,12 +60,60 @@ def load_config():
 
 config = load_config()
 
-# Override port from environment variable
-if os.environ.get("NAGI_PORT"):
-    config["port"] = int(os.environ["NAGI_PORT"])
+# Authentication configuration
+auth_config = config.get("auth", {})
+AUTH_MODE = auth_config.get("mode", "token")  # "tailscale" or "token"
+ALLOWED_USERS = auth_config.get("allowed_users", [])
 
-# Generate or load authentication token
+# Generate or load authentication token (for token mode)
 AUTH_TOKEN = os.environ.get("NAGI_TOKEN") or config.get("token") or secrets.token_urlsafe(24)
+
+# Session management for Tailscale mode
+SESSION_SECRET = secrets.token_urlsafe(32)
+active_sessions: dict[str, dict] = {}  # session_token -> user_info
+
+
+def get_tailscale_user(client_ip: str) -> Optional[dict]:
+    """Get Tailscale user info from client IP using tailscale whois."""
+    try:
+        result = subprocess.run(
+            ["tailscale", "whois", "--json", client_ip],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            user_profile = data.get("UserProfile", {})
+            return {
+                "login": user_profile.get("LoginName", ""),
+                "display_name": user_profile.get("DisplayName", ""),
+                "profile_pic": user_profile.get("ProfilePicURL", ""),
+                "node": data.get("Node", {}).get("Name", ""),
+            }
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+        pass
+    return None
+
+
+def create_session(user_info: dict) -> str:
+    """Create a new session and return the session token."""
+    session_token = secrets.token_urlsafe(32)
+    active_sessions[session_token] = user_info
+    return session_token
+
+
+def verify_session(session_token: str) -> Optional[dict]:
+    """Verify a session token and return user info if valid."""
+    return active_sessions.get(session_token)
+
+
+def is_user_allowed(user_info: dict) -> bool:
+    """Check if user is in the allowed users list."""
+    if not ALLOWED_USERS:
+        return True  # Empty list = allow all Tailnet users
+    login = user_info.get("login", "")
+    return login in ALLOWED_USERS
 
 app = FastAPI(title="Nagi")
 
@@ -61,6 +122,255 @@ static_dir = BASE_DIR / "static"
 static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+# File browser configuration
+TEXT_EXTENSIONS = {
+    '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.scss',
+    '.json', '.xml', '.yaml', '.yml', '.md', '.txt', '.sh', '.bash',
+    '.c', '.cpp', '.h', '.hpp', '.java', '.go', '.rs', '.rb', '.php',
+    '.sql', '.env', '.conf', '.ini', '.toml', '.gitignore', '.dockerfile',
+    '.vue', '.svelte', '.astro', '.lock', '.csv', '.log'
+}
+VIDEO_EXTENSIONS = {'.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v'}
+IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.bmp', '.ico'}
+MAX_FILE_SIZE = 2 * 1024 * 1024  # 2MB for text files
+
+
+def verify_auth_with_request(token: str, request: Request) -> tuple[bool, Optional[dict]]:
+    """Verify authentication token or Tailscale IP. Returns (is_valid, user_info)."""
+    if AUTH_MODE == "tailscale":
+        # First try session token
+        user_info = verify_session(token) if token else None
+        if user_info:
+            return (True, user_info)
+        # Fall back to Tailscale IP verification
+        client_ip = request.client.host if request.client else None
+        if client_ip:
+            user_info = get_tailscale_user(client_ip)
+            if user_info and is_user_allowed(user_info):
+                return (True, user_info)
+        return (False, None)
+    else:
+        return (token == AUTH_TOKEN, None)
+
+
+@app.get("/api/files")
+async def list_files(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(None),
+    show_hidden: bool = Query(False)
+):
+    """List files in a directory."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    # Default to home directory
+    target_path = Path(path) if path else Path.home()
+
+    # Security: resolve and validate path
+    try:
+        target_path = target_path.resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not target_path.exists() or not target_path.is_dir():
+        return JSONResponse(status_code=404, content={"error": "Directory not found"})
+
+    items = []
+    try:
+        for item in sorted(target_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+            if not show_hidden and item.name.startswith('.'):
+                continue
+
+            try:
+                stat = item.stat()
+                items.append({
+                    "name": item.name,
+                    "type": "directory" if item.is_dir() else "file",
+                    "size": stat.st_size if item.is_file() else None,
+                    "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    "extension": item.suffix.lower() if item.is_file() else None
+                })
+            except (PermissionError, OSError):
+                # Skip files we can't access
+                continue
+    except PermissionError:
+        return JSONResponse(status_code=403, content={"error": "Permission denied"})
+
+    return {
+        "path": str(target_path),
+        "parent": str(target_path.parent) if target_path != target_path.parent else None,
+        "items": items
+    }
+
+
+@app.get("/api/file")
+async def get_file_content(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(...)
+):
+    """Get content of a text file."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    try:
+        file_path = Path(path).resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not file_path.exists() or not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    if file_path.stat().st_size > MAX_FILE_SIZE:
+        return JSONResponse(status_code=413, content={"error": "File too large (max 1MB)"})
+
+    # MIME type detection
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+
+    # Check if text file
+    is_text = (
+        file_path.suffix.lower() in TEXT_EXTENSIONS or
+        (mime_type and mime_type.startswith('text/'))
+    )
+
+    if not is_text:
+        return JSONResponse(status_code=415, content={"error": "Not a text file"})
+
+    try:
+        content = file_path.read_text(encoding='utf-8')
+    except UnicodeDecodeError:
+        try:
+            content = file_path.read_text(encoding='latin-1')
+        except Exception:
+            return JSONResponse(status_code=415, content={"error": "Cannot decode file"})
+
+    return {
+        "path": str(file_path),
+        "name": file_path.name,
+        "extension": file_path.suffix.lower(),
+        "content": content,
+        "size": file_path.stat().st_size,
+        "mime_type": mime_type
+    }
+
+
+@app.get("/api/video")
+async def stream_video(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(...)
+):
+    """Stream a video file with Range request support."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    try:
+        file_path = Path(path).resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not file_path.exists() or not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    if file_path.suffix.lower() not in VIDEO_EXTENSIONS:
+        return JSONResponse(status_code=415, content={"error": "Not a video file"})
+
+    file_size = file_path.stat().st_size
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type = mime_type or 'video/mp4'
+
+    # Handle Range header
+    range_header = request.headers.get('range')
+
+    if range_header:
+        range_match = re.match(r'bytes=(\d+)-(\d*)', range_header)
+        if range_match:
+            start = int(range_match.group(1))
+            end = int(range_match.group(2)) if range_match.group(2) else file_size - 1
+            end = min(end, file_size - 1)
+
+            def iter_file():
+                with open(file_path, 'rb') as f:
+                    f.seek(start)
+                    remaining = end - start + 1
+                    while remaining > 0:
+                        chunk_size = min(8192, remaining)
+                        data = f.read(chunk_size)
+                        if not data:
+                            break
+                        remaining -= len(data)
+                        yield data
+
+            return StreamingResponse(
+                iter_file(),
+                status_code=206,
+                media_type=mime_type,
+                headers={
+                    'Content-Range': f'bytes {start}-{end}/{file_size}',
+                    'Accept-Ranges': 'bytes',
+                    'Content-Length': str(end - start + 1)
+                }
+            )
+
+    # No Range header - return full file
+    def iter_full_file():
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                yield chunk
+
+    return StreamingResponse(
+        iter_full_file(),
+        media_type=mime_type,
+        headers={
+            'Accept-Ranges': 'bytes',
+            'Content-Length': str(file_size)
+        }
+    )
+
+
+@app.get("/api/image")
+async def get_image(
+    request: Request,
+    token: str = Query(None),
+    path: str = Query(...)
+):
+    """Serve an image file."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse(status_code=401, content={"error": "Unauthorized"})
+
+    try:
+        file_path = Path(path).resolve()
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not file_path.exists() or not file_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    if file_path.suffix.lower() not in IMAGE_EXTENSIONS:
+        return JSONResponse(status_code=415, content={"error": "Not an image file"})
+
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    mime_type = mime_type or 'image/png'
+
+    def iter_file():
+        with open(file_path, 'rb') as f:
+            while chunk := f.read(8192):
+                yield chunk
+
+    return StreamingResponse(
+        iter_file(),
+        media_type=mime_type,
+        headers={
+            'Content-Length': str(file_path.stat().st_size),
+            'Cache-Control': 'max-age=3600'
+        }
+    )
+
 
 def set_winsize(fd: int, rows: int, cols: int) -> None:
     """Set terminal window size."""
@@ -68,35 +378,94 @@ def set_winsize(fd: int, rows: int, cols: int) -> None:
     fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
 
 
+def get_unauthorized_html(message: str = "Unauthorized") -> str:
+    """Return HTML for unauthorized access."""
+    return f"""<!DOCTYPE html>
+<html><head><title>Nagi - {message}</title>
+<style>body{{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;color:#eee;}}
+.box{{text-align:center;padding:40px;background:#16213e;border-radius:10px;}}
+h1{{color:#e94560;}}</style></head>
+<body><div class="box"><h1>{message}</h1><p>Access denied.</p></div></body></html>"""
+
+
 @app.get("/")
-async def index(token: str = Query(None)):
-    """Serve the main terminal page with token validation."""
-    if token != AUTH_TOKEN:
-        return HTMLResponse(
-            content="""<!DOCTYPE html>
-<html><head><title>Nagi - Unauthorized</title>
-<style>body{font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#1a1a2e;color:#eee;}
-.box{text-align:center;padding:40px;background:#16213e;border-radius:10px;}
-h1{color:#e94560;}</style></head>
-<body><div class="box"><h1>Unauthorized</h1><p>Invalid or missing token.<br>Please use the URL displayed in the terminal.</p></div></body></html>""",
-            status_code=401
-        )
+async def index(request: Request, token: str = Query(None)):
+    """Serve the main terminal page with authentication."""
+    session_token = None
+    user_info = None
+
+    client_ip = request.client.host if request.client else "unknown"
+
+    if AUTH_MODE == "tailscale":
+        # Tailscale authentication mode
+        if not client_ip or client_ip == "unknown":
+            logger.warning(f"Connection rejected: No client IP")
+            return HTMLResponse(content=get_unauthorized_html("No Client IP"), status_code=401)
+
+        user_info = get_tailscale_user(client_ip)
+        if not user_info:
+            logger.warning(f"Connection rejected: {client_ip} - Not a Tailscale connection")
+            return HTMLResponse(
+                content=get_unauthorized_html("Not a Tailscale connection"),
+                status_code=401
+            )
+
+        if not is_user_allowed(user_info):
+            logger.warning(f"Connection rejected: {client_ip} - User '{user_info.get('login')}' not allowed")
+            return HTMLResponse(
+                content=get_unauthorized_html("User not allowed"),
+                status_code=403
+            )
+
+        # Create session for WebSocket authentication
+        session_token = create_session(user_info)
+        logger.info(f"Access granted: {client_ip} - {user_info.get('display_name')} ({user_info.get('login')}) from {user_info.get('node')}")
+    else:
+        # Token authentication mode (legacy)
+        if token != AUTH_TOKEN:
+            logger.warning(f"Connection rejected: {client_ip} - Invalid token")
+            return HTMLResponse(
+                content=get_unauthorized_html("Invalid or missing token"),
+                status_code=401
+            )
+        session_token = AUTH_TOKEN
+        logger.info(f"Access granted: {client_ip} - Token auth")
+
     html_path = BASE_DIR / "templates" / "index.html"
     html_content = html_path.read_text()
     # Inject token, hostname and IP into HTML
     hostname = get_hostname()
     ip_addr = get_ip_address()
-    inject_script = f'<script>window.NAGI_TOKEN="{AUTH_TOKEN}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";</script></head>'
+    user_display = user_info.get("display_name", "") if user_info else ""
+    inject_script = f'<script>window.NAGI_TOKEN="{session_token}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";window.NAGI_USER="{user_display}";</script></head>'
     html_content = html_content.replace("</head>", inject_script)
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(
+        content=html_content,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+    )
 
 
 @app.websocket("/ws")
 async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
     """WebSocket endpoint for terminal communication."""
-    if token != AUTH_TOKEN:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
+    client_ip = websocket.client.host if websocket.client else "unknown"
+
+    # Verify authentication
+    if AUTH_MODE == "tailscale":
+        user_info = verify_session(token) if token else None
+        if not user_info:
+            logger.warning(f"WebSocket rejected: {client_ip} - Invalid session")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+        logger.info(f"WebSocket connected: {client_ip} - {user_info.get('display_name', 'unknown')}")
+    else:
+        if token != AUTH_TOKEN:
+            logger.warning(f"WebSocket rejected: {client_ip} - Invalid token")
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+        logger.info(f"WebSocket connected: {client_ip}")
+        user_info = None
+
     await websocket.accept()
 
     # Create pseudo-terminal
@@ -204,10 +573,31 @@ async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
                 process.kill()
             except Exception:
                 pass
+        if AUTH_MODE == "tailscale" and user_info:
+            logger.info(f"WebSocket disconnected: {client_ip} - {user_info.get('display_name', 'unknown')}")
+        else:
+            logger.info(f"WebSocket disconnected: {client_ip}")
 
 
 def get_hostname():
     """Get hostname for URL."""
+    if AUTH_MODE == "tailscale":
+        # Use Tailscale node name for Tailnet access
+        try:
+            result = subprocess.run(
+                ["tailscale", "status", "--self", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                # Get short hostname (without domain suffix)
+                hostname = data.get("Self", {}).get("HostName", "")
+                if hostname:
+                    return hostname
+        except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+            pass
     return socket.gethostname()
 
 
@@ -238,15 +628,29 @@ if __name__ == "__main__":
     import uvicorn
     port = config.get("port", 8765)
     hostname = get_hostname()
-    access_url = f"http://{hostname}:{port}/?token={AUTH_TOKEN}"
 
     print("\n" + "=" * 50)
     print("  Nagi - Touch-friendly Web Terminal")
     print("=" * 50)
-    print(f"\n  Access URL:\n")
-    print(f"    {access_url}")
-    print(f"\n  Scan QR code to connect:\n")
-    print_qr_code(access_url)
+
+    if AUTH_MODE == "tailscale":
+        access_url = f"http://{hostname}:{port}/"
+        print(f"\n  Auth Mode: Tailscale")
+        if ALLOWED_USERS:
+            print(f"  Allowed Users: {', '.join(ALLOWED_USERS)}")
+        else:
+            print(f"  Allowed Users: All Tailnet users")
+        print(f"\n  Access URL:\n")
+        print(f"    {access_url}")
+        print(f"\n  (Access via Tailscale network only)")
+    else:
+        access_url = f"http://{hostname}:{port}/?token={AUTH_TOKEN}"
+        print(f"\n  Auth Mode: Token")
+        print(f"\n  Access URL:\n")
+        print(f"    {access_url}")
+        print(f"\n  Scan QR code to connect:\n")
+        print_qr_code(access_url)
+
     print("\n" + "=" * 50 + "\n")
 
     uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")

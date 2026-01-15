@@ -1,5 +1,9 @@
 {
     "startup_command": "tmux a || tmux new",
     "shell": "/bin/bash",
-    "port": 8765
+    "port": 8765,
+    "auth": {
+        "mode": "tailscale",
+        "allowed_users": []
+    }
 }
