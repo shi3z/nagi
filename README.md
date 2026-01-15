@@ -15,12 +15,25 @@ Supports fullscreen applications like tmux and Claude Code.
 - **Touch-optimized**: Fully usable without a hardware keyboard
 - **Special keys**: Ctrl, Alt, Esc, Tab, Enter, Arrow keys, etc.
 - **tmux support**: Quick button panel for tmux operations
+- **File browser**: Browse files, view source code with syntax highlighting, play videos and images
 - **Text input**: Modal for pasting long text or CJK characters
 - **Auto-execute**: Run commands automatically on connection
 - **Token auth**: Secure access with auto-generated token
 - **Tailscale auth**: Zero-config authentication via Tailscale network
 - **QR code**: Scan to connect from your phone instantly
 - **xterm.js**: Full-featured terminal emulation
+
+## File Browser
+
+<img src="images/nagi-filer.png" width="600">
+
+Click the **Files** button (top-right) to open the side panel file browser.
+
+- **Directory navigation**: Browse folders, go up with ↑ button
+- **Syntax highlighting**: View source code with highlight.js (Python, Go, Rust, TypeScript, etc.)
+- **Video streaming**: Play videos with seek support
+- **Image viewer**: View images with fullscreen support
+- **Hidden files**: Toggle visibility with checkbox
 
 ## Installation
 
