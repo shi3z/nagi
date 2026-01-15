@@ -625,9 +625,17 @@ def print_qr_code(url: str):
 
 
 if __name__ == "__main__":
+    import argparse
     import uvicorn
-    # Support NAGI_PORT environment variable (set by CLI)
-    port = int(os.environ.get("NAGI_PORT", 0)) or config.get("port", 8765)
+
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Nagi - Touch-friendly Web Terminal")
+    parser.add_argument("-p", "--port", type=int, default=0, help="Port to listen on")
+    parser.add_argument("-c", "--config", type=str, help="Path to config file")
+    args = parser.parse_args()
+
+    # Priority: CLI args > environment variable > config file > default
+    port = args.port or int(os.environ.get("NAGI_PORT", 0)) or config.get("port", 8765)
     hostname = get_hostname()
 
     print("\n" + "=" * 50)
