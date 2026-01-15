@@ -51,10 +51,17 @@ npm version $VERSION_TYPE --no-git-tag-version
 NEW_VERSION=$(node -p "require('./package.json').version")
 echo -e "新しいバージョン: ${GREEN}$NEW_VERSION${NC}"
 
+# pythonディレクトリに開発ファイルをコピー
+echo ""
+echo -e "${YELLOW}pythonディレクトリにファイルをコピーします...${NC}"
+cp main.py python/
+cp -r templates/* python/templates/
+echo -e "${GREEN}コピー完了${NC}"
+
 # 変更をコミット
 echo ""
 echo -e "${YELLOW}バージョン変更をコミットします...${NC}"
-git add package.json
+git add -A
 git commit -m "v$NEW_VERSION"
 
 # タグを作成
