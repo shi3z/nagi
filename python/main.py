@@ -40,7 +40,8 @@ else:
     BASE_DIR = Path(__file__).parent.resolve()
 
 # Load config
-CONFIG_PATH = BASE_DIR / "config.json"
+USER_CONFIG_PATH = Path.home() / ".nagi" / "config.json"
+LOCAL_CONFIG_PATH = BASE_DIR / "config.json"
 DEFAULT_CONFIG = {
     "startup_command": "tmux a || tmux new",
     "shell": "/bin/bash",
@@ -48,17 +49,59 @@ DEFAULT_CONFIG = {
 }
 
 def load_config():
-    """Load configuration from config.json."""
-    if CONFIG_PATH.exists():
-        try:
-            with open(CONFIG_PATH) as f:
-                config = json.load(f)
-                return {**DEFAULT_CONFIG, **config}
-        except Exception:
-            pass
+    """Load configuration from config.json. ~/.nagi/config.json takes priority."""
+    # Check ~/.nagi/config.json first
+    for config_path in [USER_CONFIG_PATH, LOCAL_CONFIG_PATH]:
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    config = json.load(f)
+                    return {**DEFAULT_CONFIG, **config}
+            except Exception:
+                pass
     return DEFAULT_CONFIG
 
 config = load_config()
+
+# Color schemes (16 variations)
+COLOR_SCHEMES = [
+    {"name": "crimson",   "bg": "#1a1a2e", "panel": "#16213e", "accent": "#e94560", "cursor": "#e94560"},
+    {"name": "emerald",   "bg": "#1a2e1a", "panel": "#163e16", "accent": "#45e960", "cursor": "#45e960"},
+    {"name": "azure",     "bg": "#1a1a2e", "panel": "#162e3e", "accent": "#4560e9", "cursor": "#4560e9"},
+    {"name": "amber",     "bg": "#2e2a1a", "panel": "#3e3616", "accent": "#e9c545", "cursor": "#e9c545"},
+    {"name": "violet",    "bg": "#2a1a2e", "panel": "#36163e", "accent": "#c545e9", "cursor": "#c545e9"},
+    {"name": "cyan",      "bg": "#1a2e2e", "panel": "#163e3e", "accent": "#45e9e9", "cursor": "#45e9e9"},
+    {"name": "coral",     "bg": "#2e1a1a", "panel": "#3e1616", "accent": "#e96045", "cursor": "#e96045"},
+    {"name": "lime",      "bg": "#262e1a", "panel": "#2e3e16", "accent": "#c5e945", "cursor": "#c5e945"},
+    {"name": "pink",      "bg": "#2e1a26", "panel": "#3e162e", "accent": "#e945c5", "cursor": "#e945c5"},
+    {"name": "sky",       "bg": "#1a262e", "panel": "#162e3e", "accent": "#45c5e9", "cursor": "#45c5e9"},
+    {"name": "orange",    "bg": "#2e261a", "panel": "#3e2e16", "accent": "#e98945", "cursor": "#e98945"},
+    {"name": "mint",      "bg": "#1a2e26", "panel": "#163e2e", "accent": "#45e9c5", "cursor": "#45e9c5"},
+    {"name": "rose",      "bg": "#2e1a22", "panel": "#3e1628", "accent": "#e94589", "cursor": "#e94589"},
+    {"name": "teal",      "bg": "#1a2e2a", "panel": "#163e36", "accent": "#45e9a5", "cursor": "#45e9a5"},
+    {"name": "gold",      "bg": "#2e2e1a", "panel": "#3e3e16", "accent": "#e9e945", "cursor": "#e9e945"},
+    {"name": "lavender",  "bg": "#261a2e", "panel": "#2e163e", "accent": "#a545e9", "cursor": "#a545e9"},
+]
+
+def get_color_scheme(scheme_id=None):
+    """Get color scheme by ID (0-15) or name. Auto-selects based on port if not specified."""
+    if scheme_id is None:
+        scheme_id = config.get("color_scheme", None)
+
+    if scheme_id is None:
+        # Auto-select based on port number
+        port = config.get("port", 8765)
+        scheme_id = port % 16
+    elif isinstance(scheme_id, str):
+        # Find by name
+        for i, scheme in enumerate(COLOR_SCHEMES):
+            if scheme["name"] == scheme_id.lower():
+                scheme_id = i
+                break
+        else:
+            scheme_id = 0
+
+    return COLOR_SCHEMES[scheme_id % 16]
 
 # Authentication configuration
 auth_config = config.get("auth", {})
@@ -437,8 +480,29 @@ async def index(request: Request, token: str = Query(None)):
     hostname = get_hostname()
     ip_addr = get_ip_address()
     user_display = user_info.get("display_name", "") if user_info else ""
-    inject_script = f'<script>window.NAGI_TOKEN="{session_token}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";window.NAGI_USER="{user_display}";</script></head>'
+
+    # Get color scheme
+    scheme = get_color_scheme()
+    color_css = f'''<style>:root{{--nagi-bg:{scheme["bg"]};--nagi-panel:{scheme["panel"]};--nagi-accent:{scheme["accent"]};--nagi-cursor:{scheme["cursor"]};}}</style>'''
+
+    inject_script = f'{color_css}<script>window.NAGI_TOKEN="{session_token}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";window.NAGI_USER="{user_display}";window.NAGI_SCHEME={json.dumps(scheme)};</script></head>'
     html_content = html_content.replace("</head>", inject_script)
+
+    # Load custom buttons from ~/.nagi/buttons.html
+    custom_buttons_path = Path.home() / ".nagi" / "buttons.html"
+    default_buttons = '''<div class="button-row">
+    <button class="btn" data-cmd="yes">yes</button>
+    <button class="btn" data-cmd="commit &amp; push">commit &amp; push</button>
+</div>'''
+    if custom_buttons_path.exists():
+        try:
+            custom_buttons = custom_buttons_path.read_text()
+            html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", custom_buttons)
+        except Exception:
+            html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", default_buttons)
+    else:
+        html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", default_buttons)
+
     return HTMLResponse(
         content=html_content,
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
