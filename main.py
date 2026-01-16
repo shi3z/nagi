@@ -160,6 +160,69 @@ def is_user_allowed(user_info: dict) -> bool:
 
 app = FastAPI(title="Nagi")
 
+# Version check for auto-update
+CURRENT_VERSION = "1.1.27"  # Should match package.json
+connected_clients: set[WebSocket] = set()
+latest_version_info: dict = {"version": CURRENT_VERSION, "has_update": False}
+
+async def check_npm_version():
+    """Check npm registry for new version."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "npm", "view", "nagi-terminal", "version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode == 0:
+            npm_version = stdout.decode().strip()
+            # Compare x.y parts
+            local_xy = ".".join(CURRENT_VERSION.split(".")[:2])
+            npm_xy = ".".join(npm_version.split(".")[:2])
+            if local_xy != npm_xy:
+                latest_version_info["version"] = npm_version
+                latest_version_info["has_update"] = True
+                # Notify all connected clients
+                await broadcast_update_available(npm_version)
+    except Exception as e:
+        logger.debug(f"Version check failed: {e}")
+
+async def broadcast_update_available(new_version: str):
+    """Broadcast update notification to all connected clients."""
+    message = json.dumps({"type": "update_available", "version": new_version, "current": CURRENT_VERSION})
+    for client in list(connected_clients):
+        try:
+            await client.send_text(message)
+        except Exception:
+            connected_clients.discard(client)
+
+async def perform_update():
+    """Perform npm global update."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "npm", "update", "-g", "nagi-terminal",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode == 0:
+            return {"success": True, "message": "Update completed. Please restart Nagi."}
+        else:
+            return {"success": False, "message": stderr.decode()}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
+@app.on_event("startup")
+async def start_version_checker():
+    """Start periodic version check."""
+    async def version_check_loop():
+        await asyncio.sleep(10)  # Initial check after 10 seconds
+        await check_npm_version()
+        while True:
+            await asyncio.sleep(300)  # Check every 5 minutes
+            await check_npm_version()
+    asyncio.create_task(version_check_loop())
+
 # Serve static files
 static_dir = BASE_DIR / "static"
 static_dir.mkdir(exist_ok=True)
@@ -415,6 +478,29 @@ async def get_image(
     )
 
 
+@app.get("/api/version")
+async def get_version(request: Request, token: str = Query(None)):
+    """Get current version and update status."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return JSONResponse({
+        "current": CURRENT_VERSION,
+        "latest": latest_version_info["version"],
+        "has_update": latest_version_info["has_update"]
+    })
+
+
+@app.post("/api/update")
+async def do_update(request: Request, token: str = Query(None)):
+    """Perform npm update."""
+    is_valid, _ = verify_auth_with_request(token, request)
+    if not is_valid:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    result = await perform_update()
+    return JSONResponse(result)
+
+
 def set_winsize(fd: int, rows: int, cols: int) -> None:
     """Set terminal window size."""
     winsize = struct.pack("HHHH", rows, cols, 0, 0)
@@ -531,6 +617,18 @@ async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
         user_info = None
 
     await websocket.accept()
+    connected_clients.add(websocket)
+
+    # Send current update status if available
+    if latest_version_info["has_update"]:
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "update_available",
+                "version": latest_version_info["version"],
+                "current": CURRENT_VERSION
+            }))
+        except Exception:
+            pass
 
     # Create pseudo-terminal
     master_fd, slave_fd = pty.openpty()
@@ -623,6 +721,7 @@ async def websocket_terminal(websocket: WebSocket, token: str = Query(None)):
     except WebSocketDisconnect:
         pass
     finally:
+        connected_clients.discard(websocket)
         running = False
         read_task.cancel()
         try:

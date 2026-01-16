@@ -849,11 +849,67 @@
                 font-size: 11px;
             }
         }
+
+        /* Update notification */
+        .update-banner {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(90deg, #16213e, #1a1a2e);
+            border-bottom: 2px solid var(--nagi-accent);
+            padding: 8px 16px;
+            z-index: 2000;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .update-banner.visible {
+            display: flex;
+        }
+        .update-banner-text {
+            color: #eee;
+            font-size: 13px;
+        }
+        .update-banner-text strong {
+            color: var(--nagi-accent);
+        }
+        .update-banner-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        .update-btn {
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            border: none;
+        }
+        .update-btn-primary {
+            background: var(--nagi-accent);
+            color: #fff;
+        }
+        .update-btn-secondary {
+            background: #333;
+            color: #aaa;
+        }
     </style>
     <!-- highlight.js for syntax highlighting -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/atom-one-dark.min.css">
 </head>
 <body>
+    <!-- Update notification banner -->
+    <div class="update-banner" id="updateBanner">
+        <span class="update-banner-text">
+            New version available: <strong id="updateVersion"></strong>
+        </span>
+        <div class="update-banner-buttons">
+            <button class="update-btn update-btn-primary" id="updateBtn">Update</button>
+            <button class="update-btn update-btn-secondary" id="dismissUpdateBtn">Later</button>
+        </div>
+    </div>
+
     <!-- File Browser Toggle Button -->
     <button class="filer-toggle-btn" id="filerToggleBtn">Files</button>
 
@@ -1493,8 +1549,19 @@
                     if (event.data instanceof ArrayBuffer) {
                         const decoder = new TextDecoder();
                         term.write(decoder.decode(event.data));
+                    } else if (event.data instanceof Blob) {
+                        event.data.text().then(text => term.write(text));
                     } else {
-                        term.write(event.data);
+                        // Check if it's a JSON message from server
+                        try {
+                            const msg = JSON.parse(event.data);
+                            if (msg.type === 'update_available') {
+                                showUpdateBanner(msg.version);
+                            }
+                        } catch (e) {
+                            // Not JSON, treat as terminal data
+                            term.write(event.data);
+                        }
                     }
                 };
             } catch (e) {
@@ -2323,6 +2390,50 @@
                 }
             }
         });
+
+        // Update notification handling
+        const updateBanner = document.getElementById('updateBanner');
+        const updateVersion = document.getElementById('updateVersion');
+        const updateBtn = document.getElementById('updateBtn');
+        const dismissUpdateBtn = document.getElementById('dismissUpdateBtn');
+
+        function showUpdateBanner(version) {
+            updateVersion.textContent = version;
+            updateBanner.classList.add('visible');
+        }
+
+        function hideUpdateBanner() {
+            updateBanner.classList.remove('visible');
+        }
+
+        if (updateBtn) {
+            updateBtn.addEventListener('click', async () => {
+                updateBtn.textContent = 'Updating...';
+                updateBtn.disabled = true;
+                try {
+                    const response = await fetch(`/api/update?token=${window.NAGI_TOKEN}`, {
+                        method: 'POST'
+                    });
+                    const result = await response.json();
+                    if (result.success) {
+                        updateBtn.textContent = 'Done!';
+                        alert(result.message);
+                    } else {
+                        updateBtn.textContent = 'Failed';
+                        alert('Update failed: ' + result.message);
+                        updateBtn.disabled = false;
+                    }
+                } catch (e) {
+                    updateBtn.textContent = 'Error';
+                    alert('Update error: ' + e.message);
+                    updateBtn.disabled = false;
+                }
+            });
+        }
+
+        if (dismissUpdateBtn) {
+            dismissUpdateBtn.addEventListener('click', hideUpdateBanner);
+        }
     </script>
 </body>
 </html>
