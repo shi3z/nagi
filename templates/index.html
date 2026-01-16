@@ -336,6 +336,41 @@
             margin-bottom: 4px;
         }
 
+        .theme-panel {
+            display: none;
+            background: #0a0a1a;
+            padding: 8px;
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+
+        .theme-panel.visible {
+            display: block;
+        }
+
+        .theme-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+        }
+
+        .theme-btn {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid transparent;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .theme-btn:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-btn.active {
+            border-color: #fff;
+        }
+
         .qwerty-row {
             display: flex;
             justify-content: center;
@@ -879,6 +914,7 @@
                         <button class="btn wide" id="tmuxBtn">tmux</button>
                         <button class="btn wide" id="qwertyBtn">KB</button>
                         <button class="btn wide" id="customBtn">Cmd</button>
+                        <button class="btn" id="themeBtn">🎨</button>
                         <button class="btn quick-cmd" id="lsBtn">ls</button>
                         <button class="btn quick-cmd" id="cdBtn">cd ..</button>
                     </div>
@@ -984,6 +1020,11 @@
 
             <!-- Custom buttons (loaded from ~/.nagi/buttons.html) -->
             <div class="custom-panel" id="customPanel"><!-- CUSTOM_BUTTONS --></div>
+
+            <!-- Theme selector panel -->
+            <div class="theme-panel" id="themePanel">
+                <div class="theme-grid" id="themeGrid"></div>
+            </div>
         </div>
     </div>
 
@@ -1617,6 +1658,85 @@
         document.querySelectorAll('[data-cmd]').forEach(btn => {
             btn.addEventListener('click', () => send(btn.dataset.cmd + '\n'));
         });
+
+        // Theme selector
+        const COLOR_SCHEMES = [
+            {name: "crimson",  bg: "#1a1a2e", panel: "#16213e", accent: "#e94560", cursor: "#e94560"},
+            {name: "emerald",  bg: "#1a2e1a", panel: "#163e16", accent: "#45e960", cursor: "#45e960"},
+            {name: "azure",    bg: "#1a1a2e", panel: "#162e3e", accent: "#4560e9", cursor: "#4560e9"},
+            {name: "amber",    bg: "#2e2a1a", panel: "#3e3616", accent: "#e9c545", cursor: "#e9c545"},
+            {name: "violet",   bg: "#2a1a2e", panel: "#36163e", accent: "#c545e9", cursor: "#c545e9"},
+            {name: "cyan",     bg: "#1a2e2e", panel: "#163e3e", accent: "#45e9e9", cursor: "#45e9e9"},
+            {name: "coral",    bg: "#2e1a1a", panel: "#3e1616", accent: "#e96045", cursor: "#e96045"},
+            {name: "lime",     bg: "#262e1a", panel: "#2e3e16", accent: "#c5e945", cursor: "#c5e945"},
+            {name: "pink",     bg: "#2e1a26", panel: "#3e162e", accent: "#e945c5", cursor: "#e945c5"},
+            {name: "sky",      bg: "#1a262e", panel: "#162e3e", accent: "#45c5e9", cursor: "#45c5e9"},
+            {name: "orange",   bg: "#2e261a", panel: "#3e2e16", accent: "#e98945", cursor: "#e98945"},
+            {name: "mint",     bg: "#1a2e26", panel: "#163e2e", accent: "#45e9c5", cursor: "#45e9c5"},
+            {name: "rose",     bg: "#2e1a22", panel: "#3e1628", accent: "#e94589", cursor: "#e94589"},
+            {name: "teal",     bg: "#1a2e2a", panel: "#163e36", accent: "#45e9a5", cursor: "#45e9a5"},
+            {name: "gold",     bg: "#2e2e1a", panel: "#3e3e16", accent: "#e9e945", cursor: "#e9e945"},
+            {name: "lavender", bg: "#261a2e", panel: "#2e163e", accent: "#a545e9", cursor: "#a545e9"},
+        ];
+
+        const themeBtn = document.getElementById('themeBtn');
+        const themePanel = document.getElementById('themePanel');
+        const themeGrid = document.getElementById('themeGrid');
+
+        // Build theme grid
+        COLOR_SCHEMES.forEach((scheme, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'theme-btn';
+            btn.style.background = scheme.accent;
+            btn.title = scheme.name;
+            btn.dataset.index = index;
+            themeGrid.appendChild(btn);
+        });
+
+        function applyTheme(index) {
+            const scheme = COLOR_SCHEMES[index];
+            document.documentElement.style.setProperty('--nagi-bg', scheme.bg);
+            document.documentElement.style.setProperty('--nagi-panel', scheme.panel);
+            document.documentElement.style.setProperty('--nagi-accent', scheme.accent);
+            document.documentElement.style.setProperty('--nagi-cursor', scheme.cursor);
+
+            // Update terminal theme
+            if (term) {
+                term.options.theme = {
+                    background: scheme.bg,
+                    foreground: '#eee',
+                    cursor: scheme.cursor,
+                };
+            }
+
+            // Update active state
+            themeGrid.querySelectorAll('.theme-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+
+            // Save to localStorage
+            localStorage.setItem('nagi-theme', index);
+        }
+
+        // Theme button click
+        if (themeBtn && themePanel) {
+            themeBtn.addEventListener('click', () => {
+                themePanel.classList.toggle('visible');
+            });
+        }
+
+        // Theme selection
+        themeGrid.addEventListener('click', (e) => {
+            if (e.target.classList.contains('theme-btn')) {
+                applyTheme(parseInt(e.target.dataset.index));
+            }
+        });
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('nagi-theme');
+        if (savedTheme !== null) {
+            applyTheme(parseInt(savedTheme));
+        }
 
         // tmux scroll mode quit (sends 'q' without Ctrl+B prefix)
         const tmuxQuitBtn = document.getElementById('tmuxQuitBtn');
