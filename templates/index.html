@@ -1677,7 +1677,10 @@
         });
         // data-cmd: send command + Enter (e.g., data-cmd="ls -la")
         document.querySelectorAll('[data-cmd]').forEach(btn => {
-            btn.addEventListener('click', () => send(btn.dataset.cmd + '\r'));
+            btn.addEventListener('click', () => {
+                send(btn.dataset.cmd);
+                setTimeout(() => send('\r'), 50);
+            });
         });
 
         // Theme selector
