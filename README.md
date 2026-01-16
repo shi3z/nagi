@@ -137,6 +137,24 @@ Expand with the `tmux` button:
 ### Text Input
 Click the `Text` button to open a modal for pasting long text or CJK characters.
 
+### Custom Buttons
+Create `~/.nagi/buttons.html` to add your own command buttons. Click `Cmd` to toggle.
+
+```html
+<div class="button-row">
+    <button class="btn" data-cmd="yes">yes</button>
+    <button class="btn" data-cmd="git status">git st</button>
+    <button class="btn" data-ctrl="c">^C</button>
+</div>
+```
+
+Available attributes:
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| `data-cmd` | Send command + Enter | `data-cmd="ls -la"` |
+| `data-send` | Send text (use `\n` for newline) | `data-send="hello\n"` |
+| `data-ctrl` | Send Ctrl+key | `data-ctrl="c"` |
+
 ## Requirements
 
 - Python 3.10+

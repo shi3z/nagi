@@ -135,6 +135,24 @@ uv run python main.py
 ### テキスト入力
 `Text`ボタンで入力モーダルを開き、長文や日本語をペーストしてターミナルに送信。
 
+### カスタムボタン
+`~/.nagi/buttons.html` を作成して独自のコマンドボタンを追加できます。`Cmd`ボタンで表示/非表示。
+
+```html
+<div class="button-row">
+    <button class="btn" data-cmd="yes">yes</button>
+    <button class="btn" data-cmd="git status">git st</button>
+    <button class="btn" data-ctrl="c">^C</button>
+</div>
+```
+
+使用可能な属性:
+| 属性 | 説明 | 例 |
+|------|------|-----|
+| `data-cmd` | コマンド実行（Enter付き） | `data-cmd="ls -la"` |
+| `data-send` | テキスト送信（`\n`で改行） | `data-send="hello\n"` |
+| `data-ctrl` | Ctrl+キー送信 | `data-ctrl="c"` |
+
 ## 要件
 
 - Python 3.10+
