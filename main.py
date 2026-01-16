@@ -492,7 +492,7 @@ async def index(request: Request, token: str = Query(None)):
     custom_buttons_path = Path.home() / ".nagi" / "buttons.html"
     default_buttons = '''<div class="button-row">
     <button class="btn" data-cmd="yes">yes</button>
-    <button class="btn" data-cmd="git add -A && git commit -m 'update' && git push">commit &amp; push</button>
+    <button class="btn" data-cmd="commit &amp; push">commit &amp; push</button>
 </div>'''
     if custom_buttons_path.exists():
         try:
