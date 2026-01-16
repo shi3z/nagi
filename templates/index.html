@@ -2416,8 +2416,11 @@
                     });
                     const result = await response.json();
                     if (result.success) {
-                        updateBtn.textContent = 'Done!';
-                        alert(result.message);
+                        updateBtn.textContent = 'Restarting...';
+                        // Server will restart, wait and reload page
+                        setTimeout(() => {
+                            location.reload();
+                        }, 3000);
                     } else {
                         updateBtn.textContent = 'Failed';
                         alert('Update failed: ' + result.message);

@@ -197,7 +197,7 @@ async def broadcast_update_available(new_version: str):
             connected_clients.discard(client)
 
 async def perform_update():
-    """Perform npm global update."""
+    """Perform npm global update and restart."""
     try:
         proc = await asyncio.create_subprocess_exec(
             "npm", "update", "-g", "nagi-terminal",
@@ -206,11 +206,20 @@ async def perform_update():
         )
         stdout, stderr = await proc.communicate()
         if proc.returncode == 0:
-            return {"success": True, "message": "Update completed. Please restart Nagi."}
+            # Schedule restart after response is sent
+            asyncio.create_task(restart_server())
+            return {"success": True, "message": "Update completed. Restarting..."}
         else:
             return {"success": False, "message": stderr.decode()}
     except Exception as e:
         return {"success": False, "message": str(e)}
+
+async def restart_server():
+    """Restart the server process."""
+    await asyncio.sleep(1)  # Give time for response to be sent
+    logger.info("Restarting Nagi...")
+    # Use os.execv to replace current process
+    os.execv(sys.executable, [sys.executable] + sys.argv)
 
 @app.on_event("startup")
 async def start_version_checker():
