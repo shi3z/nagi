@@ -339,32 +339,49 @@
         .theme-panel {
             display: none;
             background: #0a0a1a;
-            padding: 8px;
-            border-radius: 8px;
+            padding: 6px;
+            border-radius: 6px;
             margin-top: 4px;
         }
 
         .theme-panel.visible {
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .theme-mode-toggle {
+            display: flex;
+            gap: 2px;
+        }
+
+        .theme-mode-btn {
+            padding: 4px 8px;
+            font-size: 11px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            background: #222;
+            color: #aaa;
+            cursor: pointer;
+        }
+
+        .theme-mode-btn.active {
+            background: var(--nagi-accent);
+            color: #fff;
+            border-color: var(--nagi-accent);
         }
 
         .theme-grid {
-            display: grid;
-            grid-template-columns: repeat(8, 1fr);
-            gap: 4px;
+            display: flex;
+            gap: 3px;
         }
 
         .theme-btn {
-            width: 100%;
-            aspect-ratio: 1;
+            width: 18px;
+            height: 18px;
             border: 2px solid transparent;
-            border-radius: 4px;
+            border-radius: 3px;
             cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .theme-btn:hover {
-            transform: scale(1.1);
         }
 
         .theme-btn.active {
@@ -1023,6 +1040,10 @@
 
             <!-- Theme selector panel -->
             <div class="theme-panel" id="themePanel">
+                <div class="theme-mode-toggle">
+                    <button class="theme-mode-btn active" data-mode="dark">Dark</button>
+                    <button class="theme-mode-btn" data-mode="light">Light</button>
+                </div>
                 <div class="theme-grid" id="themeGrid"></div>
             </div>
         </div>
@@ -1660,62 +1681,78 @@
         });
 
         // Theme selector
-        const COLOR_SCHEMES = [
-            {name: "crimson",  bg: "#1a1a2e", panel: "#16213e", accent: "#e94560", cursor: "#e94560"},
-            {name: "emerald",  bg: "#1a2e1a", panel: "#163e16", accent: "#45e960", cursor: "#45e960"},
-            {name: "azure",    bg: "#1a1a2e", panel: "#162e3e", accent: "#4560e9", cursor: "#4560e9"},
-            {name: "amber",    bg: "#2e2a1a", panel: "#3e3616", accent: "#e9c545", cursor: "#e9c545"},
-            {name: "violet",   bg: "#2a1a2e", panel: "#36163e", accent: "#c545e9", cursor: "#c545e9"},
-            {name: "cyan",     bg: "#1a2e2e", panel: "#163e3e", accent: "#45e9e9", cursor: "#45e9e9"},
-            {name: "coral",    bg: "#2e1a1a", panel: "#3e1616", accent: "#e96045", cursor: "#e96045"},
-            {name: "lime",     bg: "#262e1a", panel: "#2e3e16", accent: "#c5e945", cursor: "#c5e945"},
-            {name: "pink",     bg: "#2e1a26", panel: "#3e162e", accent: "#e945c5", cursor: "#e945c5"},
-            {name: "sky",      bg: "#1a262e", panel: "#162e3e", accent: "#45c5e9", cursor: "#45c5e9"},
-            {name: "orange",   bg: "#2e261a", panel: "#3e2e16", accent: "#e98945", cursor: "#e98945"},
-            {name: "mint",     bg: "#1a2e26", panel: "#163e2e", accent: "#45e9c5", cursor: "#45e9c5"},
-            {name: "rose",     bg: "#2e1a22", panel: "#3e1628", accent: "#e94589", cursor: "#e94589"},
-            {name: "teal",     bg: "#1a2e2a", panel: "#163e36", accent: "#45e9a5", cursor: "#45e9a5"},
-            {name: "gold",     bg: "#2e2e1a", panel: "#3e3e16", accent: "#e9e945", cursor: "#e9e945"},
-            {name: "lavender", bg: "#261a2e", panel: "#2e163e", accent: "#a545e9", cursor: "#a545e9"},
+        const ACCENT_COLORS = [
+            {name: "red",      color: "#e94560"},
+            {name: "orange",   color: "#e98945"},
+            {name: "amber",    color: "#e9c545"},
+            {name: "lime",     color: "#a5e945"},
+            {name: "green",    color: "#45e960"},
+            {name: "teal",     color: "#45e9a5"},
+            {name: "cyan",     color: "#45e9e9"},
+            {name: "sky",      color: "#45a5e9"},
+            {name: "blue",     color: "#4560e9"},
+            {name: "violet",   color: "#a545e9"},
+            {name: "pink",     color: "#e945a5"},
+            {name: "rose",     color: "#e94580"},
         ];
+
+        let currentMode = 'dark';
+        let currentAccent = 0;
 
         const themeBtn = document.getElementById('themeBtn');
         const themePanel = document.getElementById('themePanel');
         const themeGrid = document.getElementById('themeGrid');
+        const modeBtns = document.querySelectorAll('.theme-mode-btn');
 
         // Build theme grid
-        COLOR_SCHEMES.forEach((scheme, index) => {
+        ACCENT_COLORS.forEach((accent, index) => {
             const btn = document.createElement('button');
             btn.className = 'theme-btn';
-            btn.style.background = scheme.accent;
-            btn.title = scheme.name;
+            btn.style.background = accent.color;
+            btn.title = accent.name;
             btn.dataset.index = index;
             themeGrid.appendChild(btn);
         });
 
-        function applyTheme(index) {
-            const scheme = COLOR_SCHEMES[index];
-            document.documentElement.style.setProperty('--nagi-bg', scheme.bg);
-            document.documentElement.style.setProperty('--nagi-panel', scheme.panel);
-            document.documentElement.style.setProperty('--nagi-accent', scheme.accent);
-            document.documentElement.style.setProperty('--nagi-cursor', scheme.cursor);
+        function applyTheme(mode, accentIndex) {
+            const accent = ACCENT_COLORS[accentIndex];
+            let bg, panel, fg;
+
+            if (mode === 'dark') {
+                bg = '#1a1a2e';
+                panel = '#16213e';
+                fg = '#eeeeee';
+            } else {
+                bg = '#f5f5f5';
+                panel = '#e8e8e8';
+                fg = '#222222';
+            }
+
+            document.documentElement.style.setProperty('--nagi-bg', bg);
+            document.documentElement.style.setProperty('--nagi-panel', panel);
+            document.documentElement.style.setProperty('--nagi-accent', accent.color);
+            document.documentElement.style.setProperty('--nagi-cursor', accent.color);
 
             // Update terminal theme
             if (term) {
                 term.options.theme = {
-                    background: scheme.bg,
-                    foreground: '#eee',
-                    cursor: scheme.cursor,
+                    background: bg,
+                    foreground: fg,
+                    cursor: accent.color,
                 };
             }
 
-            // Update active state
+            // Update active states
             themeGrid.querySelectorAll('.theme-btn').forEach((btn, i) => {
-                btn.classList.toggle('active', i === index);
+                btn.classList.toggle('active', i === accentIndex);
+            });
+            modeBtns.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.mode === mode);
             });
 
-            // Save to localStorage
-            localStorage.setItem('nagi-theme', index);
+            currentMode = mode;
+            currentAccent = accentIndex;
+            localStorage.setItem('nagi-theme', JSON.stringify({mode, accent: accentIndex}));
         }
 
         // Theme button click
@@ -1725,17 +1762,29 @@
             });
         }
 
-        // Theme selection
+        // Mode toggle
+        modeBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                applyTheme(btn.dataset.mode, currentAccent);
+            });
+        });
+
+        // Accent selection
         themeGrid.addEventListener('click', (e) => {
             if (e.target.classList.contains('theme-btn')) {
-                applyTheme(parseInt(e.target.dataset.index));
+                applyTheme(currentMode, parseInt(e.target.dataset.index));
             }
         });
 
         // Load saved theme
         const savedTheme = localStorage.getItem('nagi-theme');
-        if (savedTheme !== null) {
-            applyTheme(parseInt(savedTheme));
+        if (savedTheme) {
+            try {
+                const {mode, accent} = JSON.parse(savedTheme);
+                applyTheme(mode, accent);
+            } catch (e) {
+                // Ignore invalid saved theme
+            }
         }
 
         // tmux scroll mode quit (sends 'q' without Ctrl+B prefix)
