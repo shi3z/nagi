@@ -16,6 +16,8 @@ Supports fullscreen applications like tmux and Claude Code.
 - **Special keys**: Ctrl, Alt, Esc, Tab, Enter, Arrow keys, etc.
 - **tmux support**: Quick button panel for tmux operations
 - **File browser**: Browse files, view source code with syntax highlighting, play videos and images
+- **Color themes**: Dark/Light mode with 12 accent colors
+- **Custom buttons**: Add your own command buttons (default: yes, commit & push)
 - **Text input**: Modal for pasting long text or CJK characters
 - **Auto-execute**: Run commands automatically on connection
 - **Token auth**: Secure access with auto-generated token
@@ -137,13 +139,18 @@ Expand with the `tmux` button:
 ### Text Input
 Click the `Text` button to open a modal for pasting long text or CJK characters.
 
+### Color Themes
+Click the `🎨` button to open the theme selector. Choose between Dark/Light mode and 12 accent colors. Your selection is saved in the browser.
+
 ### Custom Buttons
-Create `~/.nagi/buttons.html` to add your own command buttons. Click `Cmd` to toggle.
+Click `Cmd` to toggle custom command buttons. Default buttons include `yes` and `commit & push`.
+
+To customize, create `~/.nagi/buttons.html`:
 
 ```html
 <div class="button-row">
     <button class="btn" data-cmd="yes">yes</button>
-    <button class="btn" data-cmd="git status">git st</button>
+    <button class="btn" data-cmd="commit &amp; push">commit & push</button>
     <button class="btn" data-ctrl="c">^C</button>
 </div>
 ```

@@ -14,6 +14,8 @@ tmuxやClaude Codeなどのフルスクリーンアプリケーションに対�
 - **特殊キーボタン**: Ctrl, Alt, Esc, Tab, Enter, 矢印キー等
 - **tmuxサポート**: tmux操作用のクイックボタンパネル
 - **ファイラー**: ファイル閲覧、シンタックスハイライト付きソースコード表示、動画・画像再生
+- **カラーテーマ**: ダーク/ライトモード切替、12色のアクセントカラー
+- **カスタムボタン**: コマンドボタンを追加可能（デフォルト: yes, commit & push）
 - **日本語入力**: テキスト入力モーダルで長文入力に対応
 - **自動コマンド実行**: 接続時に指定コマンドを自動実行
 - **トークン認証**: 自動生成トークンで安全にアクセス
@@ -135,13 +137,18 @@ uv run python main.py
 ### テキスト入力
 `Text`ボタンで入力モーダルを開き、長文や日本語をペーストしてターミナルに送信。
 
+### カラーテーマ
+`🎨`ボタンでテーマセレクターを開きます。ダーク/ライトモードと12色のアクセントカラーから選択可能。設定はブラウザに保存されます。
+
 ### カスタムボタン
-`~/.nagi/buttons.html` を作成して独自のコマンドボタンを追加できます。`Cmd`ボタンで表示/非表示。
+`Cmd`ボタンでカスタムコマンドボタンを表示/非表示。デフォルトで`yes`と`commit & push`ボタンが用意されています。
+
+カスタマイズするには `~/.nagi/buttons.html` を作成:
 
 ```html
 <div class="button-row">
     <button class="btn" data-cmd="yes">yes</button>
-    <button class="btn" data-cmd="git status">git st</button>
+    <button class="btn" data-cmd="commit &amp; push">commit & push</button>
     <button class="btn" data-ctrl="c">^C</button>
 </div>
 ```
