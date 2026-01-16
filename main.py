@@ -219,7 +219,7 @@ async def start_version_checker():
         await asyncio.sleep(10)  # Initial check after 10 seconds
         await check_npm_version()
         while True:
-            await asyncio.sleep(300)  # Check every 5 minutes
+            await asyncio.sleep(86400)  # Check once per day
             await check_npm_version()
     asyncio.create_task(version_check_loop())
 
