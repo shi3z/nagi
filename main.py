@@ -40,7 +40,8 @@ else:
     BASE_DIR = Path(__file__).parent.resolve()
 
 # Load config
-CONFIG_PATH = BASE_DIR / "config.json"
+USER_CONFIG_PATH = Path.home() / ".nagi" / "config.json"
+LOCAL_CONFIG_PATH = BASE_DIR / "config.json"
 DEFAULT_CONFIG = {
     "startup_command": "tmux a || tmux new",
     "shell": "/bin/bash",
@@ -48,14 +49,16 @@ DEFAULT_CONFIG = {
 }
 
 def load_config():
-    """Load configuration from config.json."""
-    if CONFIG_PATH.exists():
-        try:
-            with open(CONFIG_PATH) as f:
-                config = json.load(f)
-                return {**DEFAULT_CONFIG, **config}
-        except Exception:
-            pass
+    """Load configuration from config.json. ~/.nagi/config.json takes priority."""
+    # Check ~/.nagi/config.json first
+    for config_path in [USER_CONFIG_PATH, LOCAL_CONFIG_PATH]:
+        if config_path.exists():
+            try:
+                with open(config_path) as f:
+                    config = json.load(f)
+                    return {**DEFAULT_CONFIG, **config}
+            except Exception:
+                pass
     return DEFAULT_CONFIG
 
 config = load_config()
