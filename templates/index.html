@@ -318,7 +318,7 @@
             margin-top: 4px;
         }
 
-        .custom-panel:not(:empty) {
+        .custom-panel.visible {
             display: block;
         }
 
@@ -871,6 +871,7 @@
                     <div class="button-row iphone-hide">
                         <button class="btn wide" id="tmuxBtn">tmux</button>
                         <button class="btn wide" id="qwertyBtn">KB</button>
+                        <button class="btn wide" id="customBtn">Cmd</button>
                         <button class="btn quick-cmd" id="lsBtn">ls</button>
                         <button class="btn quick-cmd" id="cdBtn">cd ..</button>
                     </div>
@@ -1570,6 +1571,16 @@
 
         if (tmuxBtn) tmuxBtn.addEventListener('click', () => tmuxPanel.classList.toggle('visible'));
         if (tmuxBtn2) tmuxBtn2.addEventListener('click', () => tmuxPanel.classList.toggle('visible'));
+
+        // Custom panel toggle
+        const customBtn = document.getElementById('customBtn');
+        const customPanel = document.getElementById('customPanel');
+        if (customBtn && customPanel) {
+            customBtn.addEventListener('click', () => {
+                customPanel.classList.toggle('visible');
+                customBtn.textContent = customPanel.classList.contains('visible') ? 'Cmd ✓' : 'Cmd';
+            });
+        }
 
         document.querySelectorAll('[data-tmux]').forEach(btn => {
             btn.addEventListener('click', () => send('\x02' + btn.dataset.tmux));
