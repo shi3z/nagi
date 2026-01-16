@@ -13,12 +13,19 @@
             -webkit-tap-highlight-color: transparent;
         }
 
+        :root {
+            --nagi-bg: var(--nagi-bg);
+            --nagi-panel: var(--nagi-panel);
+            --nagi-accent: var(--nagi-accent);
+            --nagi-cursor: var(--nagi-accent);
+        }
+
         html, body {
             margin: 0;
             padding: 0;
             height: 100%;
             overflow: hidden;
-            background: #1a1a2e;
+            background: var(--nagi-bg);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
 
@@ -40,12 +47,12 @@
         }
 
         .control-panel {
-            background: #16213e;
+            background: var(--nagi-panel);
             padding: 8px;
             display: flex;
             flex-direction: column;
             gap: 6px;
-            border-top: 1px solid #0f3460;
+            border-top: 1px solid var(--nagi-accent);
         }
 
         .control-main {
@@ -119,8 +126,8 @@
 
         .btn {
             background: #0f3460;
-            color: #e94560;
-            border: 1px solid #e94560;
+            color: var(--nagi-accent);
+            border: 1px solid var(--nagi-accent);
             border-radius: 6px;
             padding: 12px 16px;
             font-size: 14px;
@@ -134,8 +141,8 @@
         }
 
         .btn:active, .btn.active {
-            background: #e94560;
-            color: #16213e;
+            background: var(--nagi-accent);
+            color: var(--nagi-panel);
         }
 
         .btn.wide {
@@ -200,16 +207,16 @@
         }
 
         .modal {
-            background: #16213e;
+            background: var(--nagi-panel);
             border-radius: 12px;
             padding: 20px;
             width: 100%;
             max-width: 500px;
-            border: 1px solid #e94560;
+            border: 1px solid var(--nagi-accent);
         }
 
         .modal h3 {
-            color: #e94560;
+            color: var(--nagi-accent);
             margin: 0 0 15px 0;
             font-size: 16px;
         }
@@ -217,7 +224,7 @@
         .modal textarea {
             width: 100%;
             height: 120px;
-            background: #1a1a2e;
+            background: var(--nagi-bg);
             color: #fff;
             border: 1px solid #0f3460;
             border-radius: 8px;
@@ -229,7 +236,7 @@
 
         .modal textarea:focus {
             outline: none;
-            border-color: #e94560;
+            border-color: var(--nagi-accent);
         }
 
         .modal-buttons {
@@ -254,7 +261,7 @@
         }
 
         .modal-btn.send {
-            background: #e94560;
+            background: var(--nagi-accent);
             color: #fff;
         }
 
@@ -275,8 +282,8 @@
 
         .kbd-btn {
             background: #0f3460;
-            color: #e94560;
-            border: 1px solid #e94560;
+            color: var(--nagi-accent);
+            border: 1px solid var(--nagi-accent);
             border-radius: 6px;
             padding: 12px 14px;
             font-size: 16px;
@@ -288,8 +295,8 @@
         }
 
         .kbd-btn:active {
-            background: #e94560;
-            color: #16213e;
+            background: var(--nagi-accent);
+            color: var(--nagi-panel);
         }
 
         .kbd-btn.wide {
@@ -338,8 +345,8 @@
 
         .qwerty-btn {
             background: #0f3460;
-            color: #e94560;
-            border: 1px solid #e94560;
+            color: var(--nagi-accent);
+            border: 1px solid var(--nagi-accent);
             border-radius: 4px;
             padding: 10px 0;
             font-size: 14px;
@@ -351,8 +358,8 @@
         }
 
         .qwerty-btn:active {
-            background: #e94560;
-            color: #16213e;
+            background: var(--nagi-accent);
+            color: var(--nagi-panel);
         }
 
         .qwerty-btn.space {
@@ -365,7 +372,7 @@
         }
 
         .quick-cmd {
-            background: #1a1a2e;
+            background: var(--nagi-bg);
             font-size: 12px;
             padding: 8px 12px;
         }
@@ -390,7 +397,7 @@
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: #e94560;
+            background: var(--nagi-accent);
         }
 
         .status-dot.connected {
@@ -459,8 +466,8 @@
             top: 8px;
             right: 8px;
             background: #0f3460;
-            color: #e94560;
-            border: 1px solid #e94560;
+            color: var(--nagi-accent);
+            border: 1px solid var(--nagi-accent);
             border-radius: 6px;
             padding: 8px 12px;
             cursor: pointer;
@@ -470,8 +477,8 @@
         }
 
         .filer-toggle-btn:hover, .filer-toggle-btn:active {
-            background: #e94560;
-            color: #16213e;
+            background: var(--nagi-accent);
+            color: var(--nagi-panel);
         }
 
         .filer-panel {
@@ -480,8 +487,8 @@
             right: 0;
             width: 300px;
             height: 100%;
-            background: #16213e;
-            border-left: 1px solid #e94560;
+            background: var(--nagi-panel);
+            border-left: 1px solid var(--nagi-accent);
             transform: translateX(100%);
             transition: transform 0.3s ease;
             z-index: 500;
@@ -496,7 +503,7 @@
         .filer-header {
             padding: 12px;
             background: #0f3460;
-            border-bottom: 1px solid #e94560;
+            border-bottom: 1px solid var(--nagi-accent);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -504,7 +511,7 @@
 
         .filer-header h3 {
             margin: 0;
-            color: #e94560;
+            color: var(--nagi-accent);
             font-size: 14px;
             flex: 1;
         }
@@ -516,7 +523,7 @@
 
         .filer-path {
             padding: 8px 12px;
-            background: #1a1a2e;
+            background: var(--nagi-bg);
             font-size: 11px;
             color: #888;
             word-break: break-all;
@@ -604,16 +611,16 @@
 
         .file-viewer-header {
             padding: 8px 16px;
-            background: #16213e;
+            background: var(--nagi-panel);
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid #e94560;
+            border-bottom: 1px solid var(--nagi-accent);
         }
 
         .file-viewer-header .filename {
             flex: 1;
-            color: #e94560;
+            color: var(--nagi-accent);
             font-weight: bold;
             font-size: 14px;
             overflow: hidden;
@@ -630,7 +637,7 @@
             flex: 1;
             overflow: auto;
             padding: 0;
-            background: #1a1a2e;
+            background: var(--nagi-bg);
         }
 
         .file-viewer-content pre {
@@ -669,16 +676,16 @@
 
         .image-viewer-header {
             padding: 8px 16px;
-            background: #16213e;
+            background: var(--nagi-panel);
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid #e94560;
+            border-bottom: 1px solid var(--nagi-accent);
         }
 
         .image-viewer-header .filename {
             flex: 1;
-            color: #e94560;
+            color: var(--nagi-accent);
             font-weight: bold;
             font-size: 14px;
         }
@@ -728,16 +735,16 @@
 
         .video-player-header {
             padding: 8px 16px;
-            background: #16213e;
+            background: var(--nagi-panel);
             display: flex;
             align-items: center;
             gap: 8px;
-            border-bottom: 1px solid #e94560;
+            border-bottom: 1px solid var(--nagi-accent);
         }
 
         .video-player-header .filename {
             flex: 1;
-            color: #e94560;
+            color: var(--nagi-accent);
             font-weight: bold;
             font-size: 14px;
             overflow: hidden;
@@ -1310,14 +1317,16 @@
 
         try {
             log('Creating Terminal...');
+            // Get color scheme from server or use defaults
+            const scheme = window.NAGI_SCHEME || {bg: '#1a1a2e', accent: '#e94560', cursor: '#e94560'};
             term = new Terminal({
                 cursorBlink: true,
                 fontSize: 14,
                 fontFamily: 'Menlo, Monaco, "Courier New", monospace',
                 theme: {
-                    background: '#1a1a2e',
+                    background: scheme.bg,
                     foreground: '#eee',
-                    cursor: '#e94560',
+                    cursor: scheme.cursor,
                 },
                 allowProposedApi: true
             });
@@ -1668,8 +1677,8 @@
         if (shiftBtn) {
             shiftBtn.addEventListener('click', () => {
                 shiftActive = !shiftActive;
-                shiftBtn.style.background = shiftActive ? '#e94560' : '#0f3460';
-                shiftBtn.style.color = shiftActive ? '#16213e' : '#e94560';
+                shiftBtn.style.background = shiftActive ? 'var(--nagi-accent)' : '#0f3460';
+                shiftBtn.style.color = shiftActive ? 'var(--nagi-panel)' : 'var(--nagi-accent)';
                 updateKeyLabels();
             });
         }
@@ -1884,7 +1893,7 @@
                 const response = await fetch(url);
                 if (!response.ok) {
                     const error = await response.json();
-                    filerList.innerHTML = `<div style="padding: 20px; text-align: center; color: #e94560;">Error: ${error.error}</div>`;
+                    filerList.innerHTML = `<div style="padding: 20px; text-align: center; color: var(--nagi-accent);">Error: ${error.error}</div>`;
                     return;
                 }
 
@@ -1930,7 +1939,7 @@
 
             } catch (error) {
                 console.error('Error loading files:', error);
-                filerList.innerHTML = '<div style="padding: 20px; text-align: center; color: #e94560;">Failed to load files</div>';
+                filerList.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--nagi-accent);">Failed to load files</div>';
             }
         }
 
