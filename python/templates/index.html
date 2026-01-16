@@ -783,6 +783,7 @@
     <div class="filer-panel" id="filerPanel">
         <div class="filer-header">
             <button class="btn" id="filerBackBtn">↑</button>
+            <button class="btn" id="filerRefreshBtn">↻</button>
             <h3>File Browser</h3>
             <button class="btn" id="filerCloseBtn">×</button>
         </div>
@@ -1728,6 +1729,7 @@
         const filerToggleBtn = document.getElementById('filerToggleBtn');
         const filerCloseBtn = document.getElementById('filerCloseBtn');
         const filerBackBtn = document.getElementById('filerBackBtn');
+        const filerRefreshBtn = document.getElementById('filerRefreshBtn');
         const filerPath = document.getElementById('filerPath');
         const filerList = document.getElementById('filerList');
         const showHiddenFiles = document.getElementById('showHiddenFiles');
@@ -2006,6 +2008,10 @@
                 const parent = parts.join('/') || '/';
                 loadFiles(parent);
             }
+        });
+
+        filerRefreshBtn.addEventListener('click', () => {
+            loadFiles(currentFilerPath);
         });
 
         showHiddenFiles.addEventListener('change', () => {
