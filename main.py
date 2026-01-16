@@ -490,12 +490,18 @@ async def index(request: Request, token: str = Query(None)):
 
     # Load custom buttons from ~/.nagi/buttons.html
     custom_buttons_path = Path.home() / ".nagi" / "buttons.html"
+    default_buttons = '''<div class="button-row">
+    <button class="btn" data-cmd="yes">yes</button>
+    <button class="btn" data-cmd="git add -A && git commit -m 'update' && git push">commit &amp; push</button>
+</div>'''
     if custom_buttons_path.exists():
         try:
             custom_buttons = custom_buttons_path.read_text()
             html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", custom_buttons)
         except Exception:
-            pass
+            html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", default_buttons)
+    else:
+        html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", default_buttons)
 
     return HTMLResponse(
         content=html_content,
