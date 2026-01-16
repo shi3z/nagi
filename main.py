@@ -439,6 +439,16 @@ async def index(request: Request, token: str = Query(None)):
     user_display = user_info.get("display_name", "") if user_info else ""
     inject_script = f'<script>window.NAGI_TOKEN="{session_token}";window.NAGI_HOST="{hostname}";window.NAGI_IP="{ip_addr}";window.NAGI_USER="{user_display}";</script></head>'
     html_content = html_content.replace("</head>", inject_script)
+
+    # Load custom buttons from ~/.nagi/buttons.html
+    custom_buttons_path = Path.home() / ".nagi" / "buttons.html"
+    if custom_buttons_path.exists():
+        try:
+            custom_buttons = custom_buttons_path.read_text()
+            html_content = html_content.replace("<!-- CUSTOM_BUTTONS -->", custom_buttons)
+        except Exception:
+            pass
+
     return HTMLResponse(
         content=html_content,
         headers={"Cache-Control": "no-cache, no-store, must-revalidate"}

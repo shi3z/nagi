@@ -310,6 +310,25 @@
             display: block;
         }
 
+        .custom-panel {
+            display: none;
+            background: #0a0a1a;
+            padding: 8px;
+            border-radius: 8px;
+            margin-top: 4px;
+        }
+
+        .custom-panel:not(:empty) {
+            display: block;
+        }
+
+        .custom-panel .button-row {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            margin-bottom: 4px;
+        }
+
         .qwerty-row {
             display: flex;
             justify-content: center;
@@ -954,6 +973,9 @@
                     <button class="qwerty-btn" data-key=",">,</button>
                 </div>
             </div>
+
+            <!-- Custom buttons (loaded from ~/.nagi/buttons.html) -->
+            <div class="custom-panel" id="customPanel"><!-- CUSTOM_BUTTONS --></div>
         </div>
     </div>
 
@@ -1551,6 +1573,29 @@
 
         document.querySelectorAll('[data-tmux]').forEach(btn => {
             btn.addEventListener('click', () => send('\x02' + btn.dataset.tmux));
+        });
+
+        // Custom buttons handlers (from ~/.nagi/buttons.html)
+        // data-send: send text directly (e.g., data-send="ls -la\n")
+        document.querySelectorAll('[data-send]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const text = btn.dataset.send.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+                send(text);
+            });
+        });
+        // data-ctrl: send Ctrl+key (e.g., data-ctrl="c" for Ctrl+C)
+        document.querySelectorAll('[data-ctrl]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const key = btn.dataset.ctrl.toLowerCase();
+                const code = key.charCodeAt(0) - 96; // a=1, b=2, etc.
+                if (code > 0 && code < 27) {
+                    send(String.fromCharCode(code));
+                }
+            });
+        });
+        // data-cmd: send command + Enter (e.g., data-cmd="ls -la")
+        document.querySelectorAll('[data-cmd]').forEach(btn => {
+            btn.addEventListener('click', () => send(btn.dataset.cmd + '\n'));
         });
 
         // tmux scroll mode quit (sends 'q' without Ctrl+B prefix)
