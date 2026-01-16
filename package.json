@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node bin/nagi.js",
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "check-version": "./scripts/check-version.sh"
   },
   "keywords": [
     "terminal",
